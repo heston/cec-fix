@@ -22,11 +22,20 @@ vector<unsigned char> intToBytes(int paramInt)
 }
 
 void turnOffTV() {
+	if (!tv_is_on) {
+		std::cerr << "TV is already off!" << std::endl;
+		return;
+	}
 	std::cerr << "Turning off the TV" << std::endl;
 	tv_is_on = 0;
 }
 
 void turnOnTV() {
+	if (tv_is_on) {
+		std::cerr << "TV is already on!" << std::endl;
+		return;
+	}
+
 	std::cerr << "Turning on the TV" << std::endl;
 	tv_is_on = 1;
 }
