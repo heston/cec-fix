@@ -155,7 +155,7 @@ void replyWithVendorId(int requestor) {
 	bytes[2] = vendorId[1];
 	bytes[3] = vendorId[2];
 	if (vc_cec_send_message(requestor,
-				bytes, 3, VC_TRUE) != 0) {
+				bytes, 4, VC_TRUE) != 0) {
 		std::cerr << "Failed to reply with vendor ID." << std::endl;
 	}
 }
@@ -173,7 +173,7 @@ void replyWithPowerStatus(int requestor) {
 	bytes[0] = CEC_Opcode_ReportPowerStatus;
 	bytes[1] = tv_is_on ? CEC_POWER_STATUS_ON : CEC_POWER_STATUS_STANDBY;
 	if (vc_cec_send_message(requestor,
-				bytes, 1, VC_TRUE) != 0) {
+				bytes, 2, VC_TRUE) != 0) {
 		std::cerr << "Failed to reply with TV power status." << std::endl;
 	}
 }
