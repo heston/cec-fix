@@ -3,12 +3,22 @@
 #include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <vector>
+using namespace std;
 
 
 int serial_fd;
 bool want_on = 0;
 bool tv_is_on = 0;
 
+
+vector<unsigned char> intToBytes(int paramInt)
+{
+	 vector<unsigned char> arrayOfByte(4);
+	 for (int i = 0; i < 4; i++)
+		 arrayOfByte[3 - i] = (paramInt >> (i * 8));
+	 return arrayOfByte;
+}
 
 void turnOffTV() {
 	std::cerr << "Turning off the TV" << std::endl;
@@ -131,9 +141,12 @@ bool isRequestForVendorId(VC_CEC_MESSAGE_T &message) {
 
 // Handle 40:8C (Roku asking TV to give vendor ID)
 void replyWithVendorId(int requestor) {
-	uint8_t bytes[2];
-	bytes[0] = CEC_Opcode_GiveDeviceVendorID;
-	bytes[1] = CEC_VENDOR_ID_BROADCOM;
+	vector<unsigned char> vendorId = intToBytes(CEC_VENDOR_ID_BROADCOM);
+	uint8_t bytes[4];
+	bytes[0] = CEC_Opcode_DeviceVendorID;
+	bytes[1] = vendorId[0];
+	bytes[2] = vendorId[1];
+	bytes[3] = vendorId[2];
 	if (vc_cec_send_message(requestor,
 				bytes, 1, VC_TRUE) != 0) {
 		std::cerr << "Failed to reply with vendor ID." << std::endl;
