@@ -49,10 +49,17 @@ bool isImageViewOn(VC_CEC_MESSAGE_T &message) {
 
 // Check whether a CEC message means that the receiver is on.
 bool isReceiverOn(VC_CEC_MESSAGE_T &message) {
-	std::cerr << "Receiver has power status " << (int) message.payload[1] << ". (0=on, 1=off, 2=on_pending, 3=off_pending)" << std::endl;
-	return (message.length == 2 &&
-		    message.initiator == CEC_AllDevices_eAudioSystem &&
-		    message.payload[0] == CEC_Opcode_ReportPowerStatus &&
+	bool is_receiver_msg = (
+		message.length == 2 &&
+		message.initiator == CEC_AllDevices_eAudioSystem &&
+		message.payload[0] == CEC_Opcode_ReportPowerStatus
+	);
+
+	if (is_receiver_msg) {
+		std::cerr << "Receiver has power status " << (int) message.payload[1] << ". (0=on, 1=off, 2=on_pending, 3=off_pending)" << std::endl;
+	}
+
+	return (is_receiver_msg &&
 			(
 				message.payload[1] == CEC_POWER_STATUS_ON ||
 			    message.payload[1] == CEC_POWER_STATUS_ON_PENDING
@@ -148,7 +155,7 @@ void replyWithVendorId(int requestor) {
 	bytes[2] = vendorId[1];
 	bytes[3] = vendorId[2];
 	if (vc_cec_send_message(requestor,
-				bytes, 1, VC_TRUE) != 0) {
+				bytes, 3, VC_TRUE) != 0) {
 		std::cerr << "Failed to reply with vendor ID." << std::endl;
 	}
 }
@@ -216,6 +223,7 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 		turnOnTV();
 		// This will result in the audio system sending us back a message
 		checkAudioSystemPowerStatus();
+		return;
 	}
 
 	if (isReceiverOn(message)) {
@@ -226,6 +234,7 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 			std::cerr << "Receiver is off but we want it on." << std::endl;
 			turnOnReceiver();
 		}
+		return;
 	}
 
 	// As soon as the power-on button press is finished sending,
@@ -233,6 +242,7 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 	if (isReceiverOnCmdAck(reason, message)) {
 		std::cerr << "Power on press complete, now sending release." << std::endl;
 		turnReceiverOnComplete();
+		return;
 	}
 
 	// As soon as the power-on button release is finished sending,
@@ -240,6 +250,7 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 	if (isTurnReceiverOnCompleteCmdAck(reason, message)) {
 		std::cerr << "Power on release complete, now querying power status." << std::endl;
 		checkAudioSystemPowerStatus();
+		return;
 	}
 
 	// Detect when the TV is being told to go into standby.
@@ -247,14 +258,17 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 		resetWantOn();
 		turnOffTV();
 		broadcastStandby();
+		return;
 	}
 
 	if (isRequestForVendorId(message)) {
 		replyWithVendorId(message.initiator);
+		return;
 	}
 
 	if (isRequestForPowerStatus(message)) {
 		replyWithPowerStatus(message.initiator);
+		return;
 	}
 }
 
