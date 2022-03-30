@@ -12,6 +12,7 @@ bool want_on = 0;
 bool tv_is_on = 0;
 
 
+// TODO: This probably doesn't work right
 vector<unsigned char> intToBytes(int paramInt)
 {
 	 vector<unsigned char> arrayOfByte(4);
@@ -69,6 +70,7 @@ bool isReceiverOn(VC_CEC_MESSAGE_T &message) {
 
 // Send a CEC message to the receiver to indicate that the power on button was pressed.
 void turnOnReceiver() {
+	std::cerr << "Sending audio system power on button pressed" << std::endl;
 	uint8_t bytes[2];
 	bytes[0] = CEC_Opcode_UserControlPressed;
 	bytes[1] = CEC_User_Control_Power;
@@ -92,6 +94,7 @@ bool isReceiverOnCmdAck(uint32_t reason, VC_CEC_MESSAGE_T &message) {
 
 // Send a CEC message to indicate that the power on button has been released.
 void turnReceiverOnComplete() {
+	std::cerr << "Sending audio system power on button released" << std::endl;
 	uint8_t bytes[1];
 	bytes[0] = CEC_Opcode_UserControlReleased;
 	if (vc_cec_send_message(CEC_AllDevices_eAudioSystem,
@@ -111,6 +114,7 @@ bool isTurnReceiverOnCompleteCmdAck(uint32_t reason, VC_CEC_MESSAGE_T &message) 
 
 // Send a CEC message to query the power status of the receiver.
 void checkAudioSystemPowerStatus() {
+	std::cerr << "Checking audio system power status" << std::endl;
 	uint8_t bytes[1];
 	bytes[0] = CEC_Opcode_GiveDevicePowerStatus;
 	if (vc_cec_send_message(CEC_AllDevices_eAudioSystem,
@@ -130,6 +134,7 @@ bool isTVOffCmd(VC_CEC_MESSAGE_T &message) {
 
 // Broadcast a CEC message to all followers to enter standby mode.
 void broadcastStandby() {
+	std::cerr << "Broadcasting standby" << std::endl;
 	uint8_t bytes[1];
 	bytes[0] = CEC_Opcode_Standby;
 	if (vc_cec_send_message(CEC_BROADCAST_ADDR,
@@ -148,6 +153,7 @@ bool isRequestForVendorId(VC_CEC_MESSAGE_T &message) {
 
 // Handle 40:8C (Roku asking TV to give vendor ID)
 void replyWithVendorId(int requestor) {
+	std::cerr << "Replying with Vendor ID" << std::endl;
 	vector<unsigned char> vendorId = intToBytes(CEC_VENDOR_ID_BROADCOM);
 	uint8_t bytes[4];
 	bytes[0] = CEC_Opcode_DeviceVendorID;
@@ -169,6 +175,7 @@ bool isRequestForPowerStatus(VC_CEC_MESSAGE_T &message) {
 }
 
 void replyWithPowerStatus(int requestor) {
+	std::cerr << "Replying with power status" << std::endl;
 	uint8_t bytes[2];
 	bytes[0] = CEC_Opcode_ReportPowerStatus;
 	bytes[1] = tv_is_on ? CEC_POWER_STATUS_ON : CEC_POWER_STATUS_STANDBY;
@@ -226,9 +233,10 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 		return;
 	}
 
+	// TODO: logic here seems questionable. Verify behavior.
 	if (isReceiverOn(message)) {
+		std::cerr << "Receiver is now on." << std::endl;
 		if (want_on) {
-			std::cerr << "Receiver is now on." << std::endl;
 			resetWantOn();
 		} else {
 			std::cerr << "Receiver is off but we want it on." << std::endl;
