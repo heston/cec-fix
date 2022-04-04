@@ -3,7 +3,6 @@
 #include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <vector>
 using namespace std;
 
 
@@ -11,14 +10,11 @@ int serial_fd;
 bool want_on = 0;
 bool tv_is_on = 0;
 
-
-// TODO: This probably doesn't work right
-vector<unsigned char> intToBytes(int paramInt)
-{
-	 vector<unsigned char> arrayOfByte(4);
-	 for (int i = 0; i < 4; i++)
-		 arrayOfByte[3 - i] = (paramInt >> (i * 8));
-	 return arrayOfByte;
+void opcodeToBytes(long param, uint8_t bytes[4]) {
+	bytes[3] = (param >> 24) & 0xFF;
+	bytes[2] = (param >> 16) & 0xFF;
+	bytes[1] = (param >> 8) & 0xFF;
+	bytes[0] = (param >> 0) & 0xFF;
 }
 
 void turnOffTV() {
@@ -69,11 +65,11 @@ bool isReceiverOn(VC_CEC_MESSAGE_T &message) {
 		std::cerr << "Receiver has power status " << (int) message.payload[1] << ". (0=on, 1=off, 2=on_pending, 3=off_pending)" << std::endl;
 	}
 
-	return (is_receiver_msg &&
-			(
-				message.payload[1] == CEC_POWER_STATUS_ON ||
-			    message.payload[1] == CEC_POWER_STATUS_ON_PENDING
-			)
+	return (
+		is_receiver_msg && (
+			message.payload[1] == CEC_POWER_STATUS_ON ||
+			message.payload[1] == CEC_POWER_STATUS_ON_PENDING
+		)
 	);
 }
 
@@ -107,7 +103,7 @@ void turnReceiverOnComplete() {
 	uint8_t bytes[1];
 	bytes[0] = CEC_Opcode_UserControlReleased;
 	if (vc_cec_send_message(CEC_AllDevices_eAudioSystem,
-				bytes, 1, VC_FALSE) != 0) {
+			bytes, 1, VC_FALSE) != 0) {
 		std::cerr << "Failed to release Power On." << std::endl;
 	}
 }
@@ -127,7 +123,7 @@ void checkAudioSystemPowerStatus() {
 	uint8_t bytes[1];
 	bytes[0] = CEC_Opcode_GiveDevicePowerStatus;
 	if (vc_cec_send_message(CEC_AllDevices_eAudioSystem,
-				bytes, 1, VC_FALSE) != 0) {
+			bytes, 1, VC_FALSE) != 0) {
 		std::cerr << "Failed to check power status." << std::endl;
 	}
 }
@@ -163,14 +159,11 @@ bool isRequestForVendorId(VC_CEC_MESSAGE_T &message) {
 // Handle 40:8C (Roku asking TV to give vendor ID)
 void replyWithVendorId(int requestor) {
 	std::cerr << "Replying with Vendor ID" << std::endl;
-	vector<unsigned char> vendorId = intToBytes(CEC_VENDOR_ID_BROADCOM);
 	uint8_t bytes[4];
+	opcodeToBytes(CEC_VENDOR_ID_BROADCOM, bytes);
 	bytes[0] = CEC_Opcode_DeviceVendorID;
-	bytes[1] = vendorId[0];
-	bytes[2] = vendorId[1];
-	bytes[3] = vendorId[2];
 	if (vc_cec_send_message(requestor,
-				bytes, 4, VC_TRUE) != 0) {
+			bytes, 4, VC_TRUE) != 0) {
 		std::cerr << "Failed to reply with vendor ID." << std::endl;
 	}
 }
@@ -189,7 +182,7 @@ void replyWithPowerStatus(int requestor) {
 	bytes[0] = CEC_Opcode_ReportPowerStatus;
 	bytes[1] = tv_is_on ? CEC_POWER_STATUS_ON : CEC_POWER_STATUS_STANDBY;
 	if (vc_cec_send_message(requestor,
-				bytes, 2, VC_TRUE) != 0) {
+			bytes, 2, VC_TRUE) != 0) {
 		std::cerr << "Failed to reply with TV power status." << std::endl;
 	}
 }
@@ -235,44 +228,44 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 	// turn it on.
 	if (isImageViewOn(message)) {
 		std::cerr << "ImageViewOn, checking power status of receiver." << std::endl;
-		setWantOn();
+		// setWantOn();
 		turnOnTV();
 		// This will result in the audio system sending us back a message
-		checkAudioSystemPowerStatus();
+		// checkAudioSystemPowerStatus();
 		return;
 	}
 
-	// TODO: logic here seems questionable. Verify behavior.
-	if (isReceiverOn(message)) {
-		std::cerr << "Receiver is now on." << std::endl;
-		if (want_on) {
-			resetWantOn();
-		} else {
-			std::cerr << "Receiver is off but we want it on." << std::endl;
-			turnOnReceiver();
-		}
-		return;
-	}
+	// // TODO: logic here seems questionable. Verify behavior.
+	// if (isReceiverOn(message)) {
+	// 	std::cerr << "Receiver is now on." << std::endl;
+	// 	if (want_on) {
+	// 		resetWantOn();
+	// 	} else {
+	// 		std::cerr << "Receiver is off but we want it on." << std::endl;
+	// 		turnOnReceiver();
+	// 	}
+	// 	return;
+	// }
 
-	// As soon as the power-on button press is finished sending,
-	// also send a button release.
-	if (isReceiverOnCmdAck(reason, message)) {
-		std::cerr << "Power on press complete, now sending release." << std::endl;
-		turnReceiverOnComplete();
-		return;
-	}
+	// // As soon as the power-on button press is finished sending,
+	// // also send a button release.
+	// if (isReceiverOnCmdAck(reason, message)) {
+	// 	std::cerr << "Power on press complete, now sending release." << std::endl;
+	// 	turnReceiverOnComplete();
+	// 	return;
+	// }
 
-	// As soon as the power-on button release is finished sending,
-	// query the power status again.
-	if (isTurnReceiverOnCompleteCmdAck(reason, message)) {
-		std::cerr << "Power on release complete, now querying power status." << std::endl;
-		checkAudioSystemPowerStatus();
-		return;
-	}
+	// // As soon as the power-on button release is finished sending,
+	// // query the power status again.
+	// if (isTurnReceiverOnCompleteCmdAck(reason, message)) {
+	// 	std::cerr << "Power on release complete, now querying power status." << std::endl;
+	// 	checkAudioSystemPowerStatus();
+	// 	return;
+	// }
 
 	// Detect when the TV is being told to go into standby.
 	if (isTVOffCmd(message)) {
-		resetWantOn();
+		// resetWantOn();
 		turnOffTV();
 		broadcastStandby();
 		return;
