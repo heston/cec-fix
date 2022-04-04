@@ -6,26 +6,26 @@
 #include "spdlog/spdlog.h"
 
 using namespace std;
-
+spdlog::set_level(spdlog::level::debug); // Set global log level to debug
 
 bool tv_is_on = 0;
 
 void turnOffTV() {
 	if (!tv_is_on) {
-		cerr << "TV is already off!" << endl;
+		spdlog::info("TV is already off!");
 		return;
 	}
-	cerr << "Turning off the TV" << endl;
+	spdlog::info("Turning off the TV");
 	tv_is_on = 0;
 }
 
 void turnOnTV() {
 	if (tv_is_on) {
-		cerr << "TV is already on!" << endl;
+		spdlog::info("TV is already on!");
 		return;
 	}
 
-	cerr << "Turning on the TV" << endl;
+	spdlog::info("Turning on the TV");
 	tv_is_on = 1;
 }
 
@@ -47,12 +47,12 @@ bool isTVOffCmd(VC_CEC_MESSAGE_T &message) {
 
 // Broadcast a CEC message to all followers to enter standby mode.
 void broadcastStandby() {
-	cerr << "Broadcasting standby" << endl;
+	spdlog::info("Broadcasting standby");
 	uint8_t bytes[1];
 	bytes[0] = CEC_Opcode_Standby;
 	if (vc_cec_send_message(CEC_BROADCAST_ADDR,
 			bytes, 1, VC_FALSE) != 0) {
-		cerr << "Failed to broadcast standby command." << endl;
+		spdlog::error( "Failed to broadcast standby command.");
 	}
 }
 
@@ -66,7 +66,7 @@ bool isRequestForVendorId(VC_CEC_MESSAGE_T &message) {
 
 // Handle 40:8C (Roku asking TV to give vendor ID)
 void broadcastVendorId() {
-	cerr << "Broadcasting Vendor ID" << endl;
+	spdlog::info("Broadcasting Vendor ID");
 	uint8_t bytes[4];
 	bytes[0] = CEC_Opcode_DeviceVendorID;
 	bytes[1] = (CEC_VENDOR_ID_BROADCOM >> 16) & 0xFF;
@@ -74,7 +74,7 @@ void broadcastVendorId() {
 	bytes[3] = (CEC_VENDOR_ID_BROADCOM >> 0) & 0xFF;
 	if (vc_cec_send_message(CEC_BROADCAST_ADDR,
 			bytes, 4, VC_TRUE) != 0) {
-		cerr << "Failed to reply with vendor ID." << endl;
+		spdlog::error("Failed to reply with vendor ID.");
 	}
 }
 
@@ -87,13 +87,13 @@ bool isRequestForPowerStatus(VC_CEC_MESSAGE_T &message) {
 }
 
 void replyWithPowerStatus(int requestor) {
-	cerr << "Replying with power status" << endl;
+	spdlog::info("Replying with power status.");
 	uint8_t bytes[2];
 	bytes[0] = CEC_Opcode_ReportPowerStatus;
 	bytes[1] = tv_is_on ? CEC_POWER_STATUS_ON : CEC_POWER_STATUS_STANDBY;
 	if (vc_cec_send_message(requestor,
 			bytes, 2, VC_TRUE) != 0) {
-		cerr << "Failed to reply with TV power status." << endl;
+		spdlog::error("Failed to reply with TV power status.");
 	}
 }
 
@@ -104,19 +104,22 @@ bool parseCECMessage(VC_CEC_MESSAGE_T &message, uint32_t reason, uint32_t param1
 	int retval = vc_cec_param2message(reason, param1, param2, param3, param4, &message);
 	bool success = 0 == retval;
 
+	char * content;
+	for (size_t i = 0; i < message.length; i++)
+	{
+		content << fmt::format("{0:X} ", message.payload[i]);
+	}
+
 	if(success) {
-		cerr << hex <<
-		"Translated to message initiator=" << message.initiator <<
-		" follower=" << message.follower <<
-		" length=" << message.length <<
-		" content=";
-		for (size_t i = 0; i < message.length; i++)
-		{
-			cerr << hex << (uint32_t)message.payload[i] << " ";
-		}
-		cerr << endl;
+		spdlog::debug(
+			"Translated to message: initiator={initiator:X} follower={follower:X} length={length:d} content={content}",
+			fmt::arg("initiator", message.initiator),
+			fmt::arg("follower", message.follower),
+			fmt::arg("length", message.length),
+			fmt::arg("content", content)
+		);
 	} else {
-		cerr << "Not a valid message!" << endl;
+		spdlog::warn("Not a valid message!");
 	}
 
 	return success;
@@ -165,11 +168,12 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 }
 
 void tv_callback(void *callback_data, uint32_t reason, uint32_t p0, uint32_t p1) {
-	cerr << endl;
-	cerr << "Got a TV callback!" << endl << hex <<
-		"reason = 0x" << reason << endl << 
-		"param0 = 0x" << p0 << endl <<
-		"param1 = 0x" << p1 << endl;
+	spdlog::debug(
+		"Got a TV callback: reason={reason:X} param0={p0:X} param1={p1:X}",
+		fmt::arg("reason", reason),
+		fmt::arg("p0", p0),
+		fmt::arg("p1", p1)
+	);
 }
 
 int main(int argc, char *argv[]) {
@@ -178,19 +182,19 @@ int main(int argc, char *argv[]) {
 
 	VCHI_INSTANCE_T vchi_instance;
 	if (vchi_initialise(&vchi_instance) != 0) {
-		cerr << "Could not initiaize VHCI" << endl;
+		spdlog::critical("Could not initiaize VHCI");
 		return 1;
 	}
 
 	if (vchi_connect(nullptr, 0, vchi_instance) != 0) {
-		cerr << "Failed to connect to VHCI" << endl;
+		spdlog::critical("Failed to connect to VHCI");
 		return 1;
 	}
 
 	vc_vchi_cec_init(vchi_instance, nullptr, 0);
 
 	if (vc_cec_set_passive(VC_TRUE) != 0) {
-		cerr << "Failed to enter passive mode" << endl;
+		spdlog::critical("Failed to enter passive mode");
 		return 1;
 	}
 
@@ -198,7 +202,7 @@ int main(int argc, char *argv[]) {
 	vc_tv_register_callback(tv_callback, nullptr);
 
 	if (vc_cec_register_all() != 0) {
-		cerr << "Failed to register all opcodes" << endl;
+		spdlog::critical("Failed to register all opcodes");
 		return 1;
 	}
 
@@ -211,12 +215,11 @@ int main(int argc, char *argv[]) {
 	vc_cec_register_command(CEC_Opcode_GetMenuLanguage);
 
 	if (vc_cec_set_logical_address(CEC_AllDevices_eTV, CEC_DeviceType_TV, CEC_VENDOR_ID_BROADCOM) != 0) {
-		cerr << "Failed to set logical address" << endl;
+		spdlog::critical("Failed to set logical address");
 		return 1;
 	}
 
 	spdlog::info("Running! Press CTRL-c to exit.");
-	cerr << endl;
 
 	while (true) {
 		this_thread::sleep_for (chrono::seconds(1));
