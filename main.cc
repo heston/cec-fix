@@ -191,12 +191,15 @@ bool parseCECMessage(VC_CEC_MESSAGE_T &message, uint32_t reason, uint32_t param1
 
 	if(success) {
 		std::cerr << std::hex <<
-		"Translated to message i=" << message.initiator <<
-		" f=" << message.follower <<
-		" len=" << message.length <<
-		" content=" << (uint32_t)message.payload[0] <<
-		" " << (uint32_t)message.payload[1] <<
-		" " << (uint32_t)message.payload[2] << std::endl;
+		"Translated to message initiator=" << message.initiator <<
+		" follower=" << message.follower <<
+		" length=" << message.length <<
+		" content=";
+		for (size_t i = 0; i < message.length; i++)
+		{
+			std::cerr << std::hex << (uint32_t)message.payload[i] << " ";
+		}
+		std::cerr << std::endl;
 	} else {
 		std::cerr << "Not a valid message!" << std::endl;
 	}
@@ -206,6 +209,7 @@ bool parseCECMessage(VC_CEC_MESSAGE_T &message, uint32_t reason, uint32_t param1
 
 // General callback for all CEC messages.
 void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, uint32_t param2, uint32_t param3, uint32_t param4) {
+	std::cerr << std::endl;
 	std::cerr << "Got a callback!" << std::endl << std::hex <<
 		"reason = 0x" << reason << std::endl <<
 		"param1 = 0x" << param1 << std::endl <<
