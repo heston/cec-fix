@@ -150,14 +150,14 @@ bool isRequestForVendorId(VC_CEC_MESSAGE_T &message) {
 }
 
 // Handle 40:8C (Roku asking TV to give vendor ID)
-void replyWithVendorId(int requestor) {
-	std::cerr << "Replying with Vendor ID" << std::endl;
+void broadcastVendorId() {
+	std::cerr << "Broadcasting Vendor ID" << std::endl;
 	uint8_t bytes[4];
 	bytes[0] = CEC_Opcode_DeviceVendorID;
 	bytes[1] = (CEC_VENDOR_ID_BROADCOM >> 16) & 0xFF;
 	bytes[2] = (CEC_VENDOR_ID_BROADCOM >> 8) & 0xFF;
 	bytes[3] = (CEC_VENDOR_ID_BROADCOM >> 0) & 0xFF;
-	if (vc_cec_send_message(requestor,
+	if (vc_cec_send_message(CEC_BROADCAST_ADDR,
 			bytes, 4, VC_TRUE) != 0) {
 		std::cerr << "Failed to reply with vendor ID." << std::endl;
 	}
@@ -271,7 +271,7 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 	}
 
 	if (isRequestForVendorId(message)) {
-		replyWithVendorId(message.initiator);
+		broadcastVendorId();
 		return;
 	}
 
@@ -282,6 +282,7 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 }
 
 void tv_callback(void *callback_data, uint32_t reason, uint32_t p0, uint32_t p1) {
+	std::cerr << std::endl;
 	std::cerr << "Got a TV callback!" << std::endl << std::hex <<
 		"reason = 0x" << reason << std::endl << 
 		"param0 = 0x" << p0 << std::endl <<
