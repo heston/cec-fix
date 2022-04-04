@@ -6,7 +6,6 @@
 #include "spdlog/spdlog.h"
 
 using namespace std;
-spdlog::set_level(spdlog::level::debug); // Set global log level to debug
 
 bool tv_is_on = 0;
 
@@ -177,6 +176,8 @@ void tv_callback(void *callback_data, uint32_t reason, uint32_t p0, uint32_t p1)
 }
 
 int main(int argc, char *argv[]) {
+	spdlog::set_level(spdlog::level::debug); // Set global log level to debug
+	
 	bcm_host_init();
 	vcos_init();
 
