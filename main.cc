@@ -1,6 +1,5 @@
 #include <bcm_host.h>
 #include <iostream>
-#include <termios.h>
 #include <unistd.h>
 #include <thread>         // this_thread::sleep_for
 #include <chrono>         // chrono::seconds
@@ -214,11 +213,6 @@ int main(int argc, char *argv[]) {
 		cerr << "Failed to set logical address" << endl;
 		return 1;
 	}
-
-	struct termios tio;
-	tcgetattr(serial_fd, &tio);
-	tio.c_cflag = B9600 | CRTSCTS | CS8 | CLOCAL | CREAD;
-	tcsetattr(serial_fd, TCSANOW, &tio);
 
 	cerr << "Running! Press CTRL-c to exit." << endl;
 	cerr << endl;
