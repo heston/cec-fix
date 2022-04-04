@@ -10,13 +10,6 @@ int serial_fd;
 bool want_on = 0;
 bool tv_is_on = 0;
 
-void opcodeToBytes(long param, uint8_t bytes[4]) {
-	bytes[3] = (param >> 24) & 0xFF;
-	bytes[2] = (param >> 16) & 0xFF;
-	bytes[1] = (param >> 8) & 0xFF;
-	bytes[0] = (param >> 0) & 0xFF;
-}
-
 void turnOffTV() {
 	if (!tv_is_on) {
 		std::cerr << "TV is already off!" << std::endl;
@@ -160,8 +153,10 @@ bool isRequestForVendorId(VC_CEC_MESSAGE_T &message) {
 void replyWithVendorId(int requestor) {
 	std::cerr << "Replying with Vendor ID" << std::endl;
 	uint8_t bytes[4];
-	opcodeToBytes(CEC_VENDOR_ID_BROADCOM, bytes);
 	bytes[0] = CEC_Opcode_DeviceVendorID;
+	bytes[1] = (CEC_VENDOR_ID_BROADCOM >> 16) & 0xFF;
+	bytes[2] = (CEC_VENDOR_ID_BROADCOM >> 8) & 0xFF;
+	bytes[3] = (CEC_VENDOR_ID_BROADCOM >> 0) & 0xFF;
 	if (vc_cec_send_message(requestor,
 			bytes, 4, VC_TRUE) != 0) {
 		std::cerr << "Failed to reply with vendor ID." << std::endl;
