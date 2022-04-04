@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <thread>         // this_thread::sleep_for
 #include <chrono>         // chrono::seconds
+#include "spdlog/spdlog.h"
 
 using namespace std;
 
@@ -214,7 +215,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	cerr << "Running! Press CTRL-c to exit." << endl;
+	spdlog::info("Running! Press CTRL-c to exit.");
 	cerr << endl;
 
 	while (true) {
