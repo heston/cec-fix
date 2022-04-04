@@ -104,10 +104,10 @@ bool parseCECMessage(VC_CEC_MESSAGE_T &message, uint32_t reason, uint32_t param1
 	int retval = vc_cec_param2message(reason, param1, param2, param3, param4, &message);
 	bool success = 0 == retval;
 
-	char * content;
+	string content = "";
 	for (size_t i = 0; i < message.length; i++)
 	{
-		content << fmt::format("{0:X} ", message.payload[i]);
+		content += fmt::format("{0:X} ", message.payload[i]);
 	}
 
 	if(success) {
