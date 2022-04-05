@@ -3,15 +3,15 @@
 #include <unistd.h>
 #include <thread>         // this_thread::sleep_for
 #include <chrono>         // chrono::seconds
-#include "spdlog/spdlog.h"
-#include "lirc_client.h"
+#include <spdlog/spdlog.h>
+#include <lirc_client.h>
 
 
 using namespace std;
 
 bool tv_is_on = 0;
 int fd;
-const string REMOTE_NAME = "JVC";
+const char *REMOTE_NAME = "JVC";
 
 void turnOffTV() {
 	if (!tv_is_on) {
@@ -19,7 +19,7 @@ void turnOffTV() {
 		return;
 	}
 	spdlog::info("Turning off the TV");
-	tv_is_on = 0;
+	tv_is_on = false;
 }
 
 void turnOnTV() {
@@ -29,21 +29,23 @@ void turnOnTV() {
 	}
 
 	spdlog::info("Turning on the TV");
-	tv_is_on = 1;
+	tv_is_on = true;
 }
 
-bool blastIR(string codename) {
+bool blastIR(char *codename) {
 
 	if (fd < 0) {
 		spdlog::error("No LIRC socket available!");
-		return;
+		return false;
 	}
 
 	int result = lirc_send_one(fd, REMOTE_NAME, codename);
 	if (-1 == result) {
 		spdlog::error("Unable to send LIRC command `{}` to remote `{}`. Result code: {}.", codename, REMOTE_NAME, result)
+		return false;
 	} else {
 		spdlog::info("Sent LIRC command `{}` to remote `{}`", codename, REMOTE_NAME);
+		return true;
 	}
 }
 // Check whether a CEC message means that a device requested ImageViewOn.
