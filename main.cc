@@ -19,7 +19,13 @@ void turnOffTV() {
 		return;
 	}
 	spdlog::info("Turning off the TV");
-	tv_is_on = false;
+	// JVC projector requires two Standby commands in a row, with a pause in between.
+	bool ret1 = blastIR('STANDBY');
+	this_thread::sleep_for (chrono::seconds(1));
+	bool ret2 = blastIR('STANDBY');
+	if(ret1 && ret2) {
+		tv_is_on = false;
+	}
 }
 
 void turnOnTV() {
@@ -29,7 +35,9 @@ void turnOnTV() {
 	}
 
 	spdlog::info("Turning on the TV");
-	tv_is_on = true;
+	if(blastIR("ON")) {
+		tv_is_on = true;
+	}
 }
 
 bool blastIR(char *codename) {
