@@ -1,0 +1,14 @@
+[Unit]
+Description=CEC Fix
+After=multi-user.target
+
+[Service]
+Type=idle
+WorkingDirectory={{DIR}}
+ExecStart=./cec-fix
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target
