@@ -15,7 +15,7 @@ const char *REMOTE_NAME = "JVC";
 const char *ON_CODE = "ON";
 const char *STANDBY_CODE = "STANDBY";
 
-bool blastIR(char *codename) {
+bool blastIR(const char *codename) {
 
 	if (fd < 0) {
 		spdlog::error("No LIRC socket available!");
