@@ -4,10 +4,14 @@
 #include <thread>         // this_thread::sleep_for
 #include <chrono>         // chrono::seconds
 #include "spdlog/spdlog.h"
+#include "lirc_client.h"
+
 
 using namespace std;
 
 bool tv_is_on = 0;
+int fd;
+const string REMOTE_NAME = "JVC";
 
 void turnOffTV() {
 	if (!tv_is_on) {
@@ -28,6 +32,20 @@ void turnOnTV() {
 	tv_is_on = 1;
 }
 
+bool blastIR(string codename) {
+
+	if (fd < 0) {
+		spdlog::error("No LIRC socket available!");
+		return;
+	}
+
+	int result = lirc_send_one(fd, REMOTE_NAME, codename);
+	if (-1 == result) {
+		spdlog::error("Unable to send LIRC command `{}` to remote `{}`. Result code: {}.", codename, REMOTE_NAME, result)
+	} else {
+		spdlog::info("Sent LIRC command `{}` to remote `{}`", codename, REMOTE_NAME);
+	}
+}
 // Check whether a CEC message means that a device requested ImageViewOn.
 bool isImageViewOn(VC_CEC_MESSAGE_T &message) {
 	return (message.length == 1 &&
@@ -65,7 +83,7 @@ bool isRequestForVendorId(VC_CEC_MESSAGE_T &message) {
 
 // Handle 40:8C (Roku asking TV to give vendor ID)
 void broadcastVendorId() {
-	spdlog::info("Broadcasting Vendor ID");
+	spdlog::info("Broadcasting Vendor ID {}", CEC_VENDOR_ID_BROADCOM);
 	uint8_t bytes[4];
 	bytes[0] = CEC_Opcode_DeviceVendorID;
 	bytes[1] = (CEC_VENDOR_ID_BROADCOM >> 16) & 0xFF;
@@ -86,7 +104,7 @@ bool isRequestForPowerStatus(VC_CEC_MESSAGE_T &message) {
 }
 
 void replyWithPowerStatus(int requestor) {
-	spdlog::info("Replying with power status.");
+	spdlog::info("Replying with power status: {}", tv_is_on);
 	uint8_t bytes[2];
 	bytes[0] = CEC_Opcode_ReportPowerStatus;
 	bytes[1] = tv_is_on ? CEC_POWER_STATUS_ON : CEC_POWER_STATUS_STANDBY;
@@ -182,6 +200,13 @@ void tv_callback(void *callback_data, uint32_t reason, uint32_t p0, uint32_t p1)
 
 int main(int argc, char *argv[]) {
 	spdlog::set_level(spdlog::level::debug); // Set global log level to debug
+
+	fd = lirc_get_local_socket(NULL, 0);
+	if (fd < 0) {
+		spdlog::critical("Failed to open socket to LIRC");
+		return 2;
+	}
+
 
 	bcm_host_init();
 	vcos_init();
