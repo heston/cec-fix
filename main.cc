@@ -132,7 +132,7 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 		fmt::arg("p1", param1),
 		fmt::arg("p2", param2),
 		fmt::arg("p3", param3),
-		fmt::arg("p4", param4),
+		fmt::arg("p4", param4)
 	);
 
 	VC_CEC_MESSAGE_T message;
