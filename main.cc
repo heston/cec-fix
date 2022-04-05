@@ -13,6 +13,23 @@ bool tv_is_on = 0;
 int fd;
 const char *REMOTE_NAME = "JVC";
 
+bool blastIR(char *codename) {
+
+	if (fd < 0) {
+		spdlog::error("No LIRC socket available!");
+		return false;
+	}
+
+	int result = lirc_send_one(fd, REMOTE_NAME, codename);
+	if (-1 == result) {
+		spdlog::error("Unable to send LIRC command `{}` to remote `{}`. Result code: {}.", codename, REMOTE_NAME, result);
+		return false;
+	} else {
+		spdlog::info("Sent LIRC command `{}` to remote `{}`", codename, REMOTE_NAME);
+		return true;
+	}
+}
+
 void turnOffTV() {
 	if (!tv_is_on) {
 		spdlog::info("TV is already off!");
@@ -20,9 +37,9 @@ void turnOffTV() {
 	}
 	spdlog::info("Turning off the TV");
 	// JVC projector requires two Standby commands in a row, with a pause in between.
-	bool ret1 = blastIR('STANDBY');
+	bool ret1 = blastIR("STANDBY");
 	this_thread::sleep_for (chrono::seconds(1));
-	bool ret2 = blastIR('STANDBY');
+	bool ret2 = blastIR("STANDBY");
 	if(ret1 && ret2) {
 		tv_is_on = false;
 	}
@@ -40,22 +57,6 @@ void turnOnTV() {
 	}
 }
 
-bool blastIR(char *codename) {
-
-	if (fd < 0) {
-		spdlog::error("No LIRC socket available!");
-		return false;
-	}
-
-	int result = lirc_send_one(fd, REMOTE_NAME, codename);
-	if (-1 == result) {
-		spdlog::error("Unable to send LIRC command `{}` to remote `{}`. Result code: {}.", codename, REMOTE_NAME, result)
-		return false;
-	} else {
-		spdlog::info("Sent LIRC command `{}` to remote `{}`", codename, REMOTE_NAME);
-		return true;
-	}
-}
 // Check whether a CEC message means that a device requested ImageViewOn.
 bool isImageViewOn(VC_CEC_MESSAGE_T &message) {
 	return (message.length == 1 &&
