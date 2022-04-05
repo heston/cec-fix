@@ -106,7 +106,7 @@ bool parseCECMessage(VC_CEC_MESSAGE_T &message, uint32_t reason, uint32_t param1
 	string content = "";
 	for (size_t i = 0; i < message.length; i++)
 	{
-		content += fmt::format("{0:X} ", message.payload[i]);
+		content += fmt::format("{:X} ", message.payload[i]);
 	}
 
 	if(success) {
@@ -126,13 +126,14 @@ bool parseCECMessage(VC_CEC_MESSAGE_T &message, uint32_t reason, uint32_t param1
 
 // General callback for all CEC messages.
 void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, uint32_t param2, uint32_t param3, uint32_t param4) {
-	cerr << endl;
-	cerr << "Got a callback!" << endl << hex <<
-		"reason = 0x" << reason << endl <<
-		"param1 = 0x" << param1 << endl <<
-		"param2 = 0x" << param2 << endl <<
-		"param3 = 0x" << param3 << endl <<
-		"param4 = 0x" << param4 << endl;
+	spdlog::debug(
+		"Got a callback: reason={reason:X} param1={p1:X} param2={p1:X} param3={p3:X} param4={p4:X}",
+		fmt::arg("reason", reason),
+		fmt::arg("p1", param1),
+		fmt::arg("p2", param2),
+		fmt::arg("p3", param3),
+		fmt::arg("p4", param4),
+	);
 
 	VC_CEC_MESSAGE_T message;
 	if (!parseCECMessage(message, reason, param1, param2, param3, param4)) {
@@ -143,6 +144,7 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 	// status of the receiver, because if it's not on we'll want to
 	// turn it on.
 	if (isImageViewOn(message)) {
+		spdlog::info("ImageViewOn message received.");
 		turnOnTV();
 		// This will result in the audio system sending us back a message
 		return;
@@ -150,17 +152,20 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 
 	// Detect when the TV is being told to go into standby.
 	if (isTVOffCmd(message)) {
+		spdlog::info("Standby message received.");
 		turnOffTV();
 		broadcastStandby();
 		return;
 	}
 
 	if (isRequestForVendorId(message)) {
+		spdlog::info("Vendor ID request message received.");
 		broadcastVendorId();
 		return;
 	}
 
 	if (isRequestForPowerStatus(message)) {
+		spdlog::info("Power status request message received.");
 		replyWithPowerStatus(message.initiator);
 		return;
 	}
@@ -177,13 +182,13 @@ void tv_callback(void *callback_data, uint32_t reason, uint32_t p0, uint32_t p1)
 
 int main(int argc, char *argv[]) {
 	spdlog::set_level(spdlog::level::debug); // Set global log level to debug
-	
+
 	bcm_host_init();
 	vcos_init();
 
 	VCHI_INSTANCE_T vchi_instance;
 	if (vchi_initialise(&vchi_instance) != 0) {
-		spdlog::critical("Could not initiaize VHCI");
+		spdlog::critical("Could not initialize VHCI");
 		return 1;
 	}
 
