@@ -4,7 +4,7 @@
 #include <thread>         // this_thread::sleep_for
 #include <chrono>         // chrono::seconds
 #include <spdlog/spdlog.h>
-#include <lirc_client.h>
+#include "lirc_client.h"
 
 
 using namespace std;
@@ -12,6 +12,8 @@ using namespace std;
 bool tv_is_on = 0;
 int fd;
 const char *REMOTE_NAME = "JVC";
+const char *ON_CODE = "ON";
+const char *STANDBY_CODE = "STANDBY";
 
 bool blastIR(char *codename) {
 
@@ -37,9 +39,9 @@ void turnOffTV() {
 	}
 	spdlog::info("Turning off the TV");
 	// JVC projector requires two Standby commands in a row, with a pause in between.
-	bool ret1 = blastIR("STANDBY");
+	bool ret1 = blastIR(STANDBY_CODE);
 	this_thread::sleep_for (chrono::seconds(1));
-	bool ret2 = blastIR("STANDBY");
+	bool ret2 = blastIR(STANDBY_CODE);
 	if(ret1 && ret2) {
 		tv_is_on = false;
 	}
@@ -52,7 +54,7 @@ void turnOnTV() {
 	}
 
 	spdlog::info("Turning on the TV");
-	if(blastIR("ON")) {
+	if(blastIR(ON_CODE)) {
 		tv_is_on = true;
 	}
 }
