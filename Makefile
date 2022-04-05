@@ -6,7 +6,7 @@ clean:
 
 .PHONY: install
 install:
-	sudo sed "s|{{DIR}}|$(dirname $(realpath cecfix.service))|g" \
+	sudo sed "s|{{DIR}}|$$(dirname $$(realpath cecfix.service))|g" \
 		cecfix.service \
 		> /lib/systemd/system/cecfix.service
 	sudo chmod 644 /lib/systemd/system/cecfix.service
