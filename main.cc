@@ -6,7 +6,6 @@
 #include <spdlog/spdlog.h>
 #include "lirc_client.h"
 
-
 using namespace std;
 
 bool tv_is_on = 0;
@@ -15,6 +14,13 @@ const char* REMOTE_NAME = "JVCNX7";
 const char* ON_CODE = "KEY_POWER";
 const char* STANDBY_CODE = "KEY_POWER2";
 
+/**
+ * Send an IR codename to the default remote.
+ *
+ * @param   char  codename  Name of the remote code to send, as defined in the LIRC config file.
+ *
+ * @return  bool            true if the command was sent successfully, false otherwise.
+ */
 bool blastIR(const char *codename) {
 
 	if (fd < 0) {
@@ -32,6 +38,11 @@ bool blastIR(const char *codename) {
 	}
 }
 
+/**
+ * Turn off the TV by sending the correct IR sequence.
+ *
+ * @return  void
+ */
 void turnOffTV() {
 	if (!tv_is_on) {
 		spdlog::info("TV is already off!");
@@ -47,6 +58,11 @@ void turnOffTV() {
 	}
 }
 
+/**
+ * Turn on the TV by sending the correct IR sequence.
+ *
+ * @return  void
+ */
 void turnOnTV() {
 	if (tv_is_on) {
 		spdlog::info("TV is already on!");
@@ -59,14 +75,26 @@ void turnOnTV() {
 	}
 }
 
-// Check whether a CEC message means that a device requested ImageViewOn.
+/**
+ * Check whether a CEC message means that a device requested ImageViewOn.
+ *
+ * @param   C_CEC_MESSAGE_T  message  The parsed CEC message.
+ *
+ * @return  bool
+ */
 bool isImageViewOn(VC_CEC_MESSAGE_T &message) {
 	return (message.length == 1 &&
 		    message.payload[0] == CEC_Opcode_ImageViewOn
 	);
 }
 
-// Whether a CEC message indicates that the TV should switch to standby.
+/**
+ * Whether a CEC message indicates that the TV should switch to standby.
+ *
+ * @param   C_CEC_MESSAGE_T  message  The parsed CEC message.
+ *
+ * @return  bool
+ */
 bool isTVOffCmd(VC_CEC_MESSAGE_T &message) {
 	return (
 		message.follower == 0 &&
@@ -75,7 +103,11 @@ bool isTVOffCmd(VC_CEC_MESSAGE_T &message) {
 	);
 }
 
-// Broadcast a CEC message to all followers to enter standby mode.
+/**
+ * Broadcast a CEC message to all followers to enter standby mode.
+ *
+ * @return  void
+ */
 void broadcastStandby() {
 	spdlog::info("Broadcasting standby");
 	uint8_t bytes[1];
@@ -86,6 +118,13 @@ void broadcastStandby() {
 	}
 }
 
+/**
+ * Whether a CEC message is a request for this device's vendor ID.
+ *
+ * @param   C_CEC_MESSAGE_T  message  The parsed CEC message.
+ *
+ * @return  bool
+ */
 bool isRequestForVendorId(VC_CEC_MESSAGE_T &message) {
 	return (
 		message.follower == CEC_AllDevices_eTV &&
@@ -94,7 +133,12 @@ bool isRequestForVendorId(VC_CEC_MESSAGE_T &message) {
 	);
 }
 
-// Handle 40:8C (Roku asking TV to give vendor ID)
+/**
+ * Broadcast the vendor ID of this device.
+ * Raspberry Pi uses Broadcom chipset. Vendor ID is 0x18C086L.
+ *
+ * @return  void
+ */
 void broadcastVendorId() {
 	spdlog::info("Broadcasting Vendor ID {}", CEC_VENDOR_ID_BROADCOM);
 	uint8_t bytes[4];
@@ -108,6 +152,13 @@ void broadcastVendorId() {
 	}
 }
 
+/**
+ * Whether a CEC message is a request for this device's power status.
+ *
+ * @param   C_CEC_MESSAGE_T  message  The parsed CEC message.
+ *
+ * @return  bool
+ */
 bool isRequestForPowerStatus(VC_CEC_MESSAGE_T &message) {
 	return (
 		message.follower == CEC_AllDevices_eTV &&
@@ -116,6 +167,13 @@ bool isRequestForPowerStatus(VC_CEC_MESSAGE_T &message) {
 	);
 }
 
+/**
+ * Reply to a power status request.
+ *
+ * @param   int   requestor  The CEC logical address of the device requesting power status.
+ *
+ * @return  void
+ */
 void replyWithPowerStatus(int requestor) {
 	spdlog::info("Replying with power status: {}", tv_is_on);
 	uint8_t bytes[2];
@@ -127,9 +185,11 @@ void replyWithPowerStatus(int requestor) {
 	}
 }
 
-
-// Parse a CEC callback into a Message struct.
-// Returns true if parsing was successful, false otherwise.
+/**
+ * Parse a CEC callback into a VC_CEC_MESSAGE_T struct.
+ *
+ * @return  bool    true if parsing was successful, false otherwise.
+ */
 bool parseCECMessage(VC_CEC_MESSAGE_T &message, uint32_t reason, uint32_t param1, uint32_t param2, uint32_t param3, uint32_t param4) {
 	int retval = vc_cec_param2message(reason, param1, param2, param3, param4, &message);
 	bool success = 0 == retval;
@@ -155,7 +215,28 @@ bool parseCECMessage(VC_CEC_MESSAGE_T &message, uint32_t reason, uint32_t param1
 	return success;
 }
 
-// General callback for all CEC messages.
+/**
+ * Callback function for host side notification.
+ * This is the SAME as the callback function type defined in vc_cec.h
+ * Host applications register a single callback for all CEC related notifications.
+ * See vc_cec.h for meanings of all parameters
+ *
+ * @param callback_data is the context passed in by user in <DFN>vc_cec_register_callback</DFN>
+ *
+ * @param reason bits 15-0 is VC_CEC_NOTIFY_T in vc_cec.h;
+ *               bits 23-16 is the valid length of message in param1 to param4 (LSB of param1 is the byte0, MSB of param4 is byte15), little endian
+ *               bits 31-24 is the return code (if any)
+ *
+ * @param param1 is the first parameter
+ *
+ * @param param2 is the second parameter
+ *
+ * @param param3 is the third parameter
+ *
+ * @param param4 is the fourth parameter
+ *
+ * @return void
+ */
 void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, uint32_t param2, uint32_t param3, uint32_t param4) {
 	spdlog::debug(
 		"Got a callback: reason={reason:X} param1={p1:X} param2={p1:X} param3={p3:X} param4={p4:X}",
@@ -189,12 +270,14 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 		return;
 	}
 
+	// Roku likes to ask for this.
 	if (isRequestForVendorId(message)) {
 		spdlog::info("Vendor ID request message received.");
 		broadcastVendorId();
 		return;
 	}
 
+	// Roku also likes to ask for this.
 	if (isRequestForPowerStatus(message)) {
 		spdlog::info("Power status request message received.");
 		replyWithPowerStatus(message.initiator);
@@ -202,6 +285,22 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 	}
 }
 
+/**
+ * Callback function for host side notification.
+ * Host applications register a single callback for all TV related notifications.
+ * See <DFN>VC_HDMI_NOTIFY_T</DFN> and <DFN>VC_SDTV_NOTIFY_T</DFN> in vc_hdmi.h and vc_sdtv.h
+ * respectively for list of reasons and respective param1 and param2
+ *
+ * @param callback_data is the context passed in during the call to vc_tv_register_callback
+ *
+ * @param reason is the notification reason
+ *
+ * @param param1 is the first optional parameter
+ *
+ * @param param2 is the second optional parameter
+ *
+ * @return void
+ */
 void tv_callback(void *callback_data, uint32_t reason, uint32_t p0, uint32_t p1) {
 	spdlog::debug(
 		"Got a TV callback: reason={reason:X} param0={p0:X} param1={p1:X}",
@@ -211,6 +310,16 @@ void tv_callback(void *callback_data, uint32_t reason, uint32_t p0, uint32_t p1)
 	);
 }
 
+/**
+ * Bootstrap all the things!
+ *
+ * @param   int   argc  Not used
+ * @param   char  argv  Not used
+ *
+ * @return  int         0: process exited normally.
+ * 						1: process exited due to critical CEC error.
+ * 						2: process exited due to critical LIRC error.
+ */
 int main(int argc, char *argv[]) {
 	spdlog::set_level(spdlog::level::debug); // Set global log level to debug
 
