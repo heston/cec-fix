@@ -1,5 +1,5 @@
 cec-fix: main.cc
-	g++ -Wall -I include -I /usr/include -I /opt/vc/include -L /opt/vc/lib -l bcm_host -l vchiq_arm -l vcos -l lirc main.cc -o cec-fix
+	g++ -Wall -I include -I /usr/include -I /opt/vc/include -L /opt/vc/lib -L /usr/lib -l bcm_host -l vchiq_arm -l vcos -l lirc /usr/lib/arm-linux-gnueabihf/liblirc_client.so main.cc -o cec-fix
 
 clean:
 	rm cec-fix

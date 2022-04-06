@@ -11,9 +11,9 @@ using namespace std;
 
 bool tv_is_on = 0;
 int fd;
-const char *REMOTE_NAME = "JVC";
-const char *ON_CODE = "ON";
-const char *STANDBY_CODE = "STANDBY";
+const char* REMOTE_NAME = "JVCNX7";
+const char* ON_CODE = "KEY_POWER";
+const char* STANDBY_CODE = "KEY_POWER2";
 
 bool blastIR(const char *codename) {
 
@@ -218,6 +218,8 @@ int main(int argc, char *argv[]) {
 	if (fd < 0) {
 		spdlog::critical("Failed to open socket to LIRC");
 		return 2;
+	} else {
+		spdlog::debug("LIRC socket established")
 	}
 
 
