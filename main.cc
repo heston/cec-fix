@@ -22,7 +22,6 @@ const char* STANDBY_CODE = "KEY_POWER2";
  * @return  bool            true if the command was sent successfully, false otherwise.
  */
 bool blastIR(const char *codename) {
-
 	if (fd < 0) {
 		spdlog::error("No LIRC socket available!");
 		return false;
@@ -301,13 +300,81 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
  *
  * @return void
  */
-void tv_callback(void *callback_data, uint32_t reason, uint32_t p0, uint32_t p1) {
+void handleTVCallback(void *callback_data, uint32_t reason, uint32_t p0, uint32_t p1) {
 	spdlog::debug(
 		"Got a TV callback: reason={reason:X} param0={p0:X} param1={p1:X}",
 		fmt::arg("reason", reason),
 		fmt::arg("p0", p0),
 		fmt::arg("p1", p1)
 	);
+}
+
+/**
+ * Set up CEC handlers.
+ *
+ * @return  bool    Whether CEC was configured successfully.
+ */
+bool initCEC() {
+	bcm_host_init();
+	vcos_init();
+
+	VCHI_INSTANCE_T vchi_instance;
+	if (vchi_initialise(&vchi_instance) != 0) {
+		spdlog::critical("Could not initialize VHCI");
+		return false;
+	}
+
+	if (vchi_connect(nullptr, 0, vchi_instance) != 0) {
+		spdlog::critical("Failed to connect to VHCI");
+		return false;
+	}
+
+	vc_vchi_cec_init(vchi_instance, nullptr, 0);
+
+	if (vc_cec_set_passive(VC_TRUE) != 0) {
+		spdlog::critical("Failed to enter passive mode");
+		return false;
+	}
+
+	vc_cec_register_callback(handleCECCallback, nullptr);
+	vc_tv_register_callback(handleTVCallback, nullptr);
+
+	if (vc_cec_register_all() != 0) {
+		spdlog::critical("Failed to register all opcodes");
+		return false;
+	}
+
+	vc_cec_register_command(CEC_Opcode_GivePhysicalAddress);
+	vc_cec_register_command(CEC_Opcode_GiveDeviceVendorID);
+	vc_cec_register_command(CEC_Opcode_GiveOSDName);
+	vc_cec_register_command(CEC_Opcode_GetCECVersion);
+	vc_cec_register_command(CEC_Opcode_GiveDevicePowerStatus);
+	vc_cec_register_command(CEC_Opcode_MenuRequest);
+	vc_cec_register_command(CEC_Opcode_GetMenuLanguage);
+
+	if (vc_cec_set_logical_address(CEC_AllDevices_eTV, CEC_DeviceType_TV, CEC_VENDOR_ID_BROADCOM) != 0) {
+		spdlog::critical("Failed to set logical address");
+		return false;
+	}
+
+	spdlog::debug("CEC init successful");
+	return true;
+}
+
+/**
+ * Set up LIRC socket.
+ *
+ * @return  bool    Whether the socket was established.
+ */
+bool initLIRC() {
+	fd = lirc_get_local_socket(NULL, 0);
+	if (fd < 0) {
+		spdlog::critical("Failed to open socket to LIRC");
+		return false;
+	}
+
+	spdlog::debug("LIRC socket established");
+	return true;
 }
 
 /**
@@ -323,61 +390,18 @@ void tv_callback(void *callback_data, uint32_t reason, uint32_t p0, uint32_t p1)
 int main(int argc, char *argv[]) {
 	spdlog::set_level(spdlog::level::debug); // Set global log level to debug
 
-	fd = lirc_get_local_socket(NULL, 0);
-	if (fd < 0) {
-		spdlog::critical("Failed to open socket to LIRC");
+	if (!initCEC()) {
+		return 1;
+	}
+
+	if (!initLIRC()) {
 		return 2;
-	} else {
-		spdlog::debug("LIRC socket established")
-	}
-
-
-	bcm_host_init();
-	vcos_init();
-
-	VCHI_INSTANCE_T vchi_instance;
-	if (vchi_initialise(&vchi_instance) != 0) {
-		spdlog::critical("Could not initialize VHCI");
-		return 1;
-	}
-
-	if (vchi_connect(nullptr, 0, vchi_instance) != 0) {
-		spdlog::critical("Failed to connect to VHCI");
-		return 1;
-	}
-
-	vc_vchi_cec_init(vchi_instance, nullptr, 0);
-
-	if (vc_cec_set_passive(VC_TRUE) != 0) {
-		spdlog::critical("Failed to enter passive mode");
-		return 1;
-	}
-
-	vc_cec_register_callback(handleCECCallback, nullptr);
-	vc_tv_register_callback(tv_callback, nullptr);
-
-	if (vc_cec_register_all() != 0) {
-		spdlog::critical("Failed to register all opcodes");
-		return 1;
-	}
-
-	vc_cec_register_command(CEC_Opcode_GivePhysicalAddress);
-	vc_cec_register_command(CEC_Opcode_GiveDeviceVendorID);
-	vc_cec_register_command(CEC_Opcode_GiveOSDName);
-	vc_cec_register_command(CEC_Opcode_GetCECVersion);
-	vc_cec_register_command(CEC_Opcode_GiveDevicePowerStatus);
-	vc_cec_register_command(CEC_Opcode_MenuRequest);
-	vc_cec_register_command(CEC_Opcode_GetMenuLanguage);
-
-	if (vc_cec_set_logical_address(CEC_AllDevices_eTV, CEC_DeviceType_TV, CEC_VENDOR_ID_BROADCOM) != 0) {
-		spdlog::critical("Failed to set logical address");
-		return 1;
 	}
 
 	spdlog::info("Running! Press CTRL-c to exit.");
 
 	while (true) {
-		this_thread::sleep_for (chrono::seconds(1));
+		this_thread::sleep_for(chrono::seconds(1));
 	}
 
 	return 0;
