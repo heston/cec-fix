@@ -4,9 +4,9 @@
 #include <stdlib.h>
 #include <thread>         // this_thread::sleep_for
 #include <chrono>         // chrono::seconds
-#include <spdlog/spdlog.h>
+#include "spdlog/spdlog.h"
 #include <string.h>
-// #include <signal.h>
+#include <signal.h>
 #include "lirc_client.h"
 
 using namespace std;
@@ -495,7 +495,7 @@ int main(int argc, char *argv[]) {
 
 	atexit(cleanupLIRC);
 
-	// Handle SIGNINT cleanly
+	// Handle SIGINT cleanly
 	struct sigaction sigIntHandler;
 	sigIntHandler.sa_handler = handleSIGINT;
 	sigemptyset(&sigIntHandler.sa_mask);
@@ -505,7 +505,7 @@ int main(int argc, char *argv[]) {
 	spdlog::info("Running! Press CTRL-c to exit.");
 
 	while (want_run) {
-		this_thread::sleep_for(chrono::seconds(1));
+		pause();
 	}
 
 	return 0;
