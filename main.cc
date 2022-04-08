@@ -20,7 +20,7 @@ const char* STANDBY_CODE = "KEY_POWER2";
 const char* IR_SEND_START = "SEND_START";
 const char* IR_SEND_STOP = "SEND_STOP";
 // The amount of time to repeat a blasted IR code.
-const int IR_REPEAT_MS = 300;
+const int IR_REPEAT_MS = 1000;
 // The amount of time to wait between blasting a repeated standby code to the projector.
 // The JVC projector shows a confirmation screen the first time it receives a standby command.
 // Actually putting the projector into standby requires confirming by sending standby again.
@@ -37,11 +37,11 @@ const int TV_OFF_REPEAT_GAP_S = 1;
 bool send_ir_packet(lirc_cmd_ctx* ctx) {
 	int r;
 	do {
-			r = lirc_command_run(ctx, fd);
-			if (r != 0 && r != EAGAIN) {
-				spdlog::error("Error running command: {}", strerror(r));
-				return false;
-			}
+		r = lirc_command_run(ctx, fd);
+		if (r != 0 && r != EAGAIN) {
+			spdlog::error("Error running command: {}", strerror(r));
+			return false;
+		}
 	} while (r == EAGAIN);
 	return r == 0 ? true : false;
 }
@@ -107,6 +107,8 @@ bool blastIR(const char *codename) {
 		return false;
 	}
 
+	this_thread::sleep_for(chrono::milliseconds(IR_REPEAT_MS));
+
 	spdlog::info("Sent LIRC command `{}` to remote `{}`", codename, REMOTE_NAME);
 	return true;
 }
@@ -123,12 +125,12 @@ void turnOffTV() {
 	}
 	spdlog::info("Turning off the TV");
 	// JVC projector requires two Standby commands in a row, with a pause in between.
-	bool ret1 = blastIR(STANDBY_CODE);
-	this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
-	bool ret2 = blastIR(STANDBY_CODE);
-	if(ret1 && ret2) {
-		tv_is_on = false;
-	}
+	if(blastIR(STANDBY_CODE)) {
+		this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
+		if(blastIR(STANDBY_CODE)) {
+			tv_is_on = false;
+			this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
+		}
 }
 
 /**
@@ -145,6 +147,7 @@ void turnOnTV() {
 	spdlog::info("Turning on the TV");
 	if(blastIR(ON_CODE)) {
 		tv_is_on = true;
+		this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
 	}
 }
 
