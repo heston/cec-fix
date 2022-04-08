@@ -131,6 +131,7 @@ void turnOffTV() {
 			tv_is_on = false;
 			this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
 		}
+	}
 }
 
 /**
