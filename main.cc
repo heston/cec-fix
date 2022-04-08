@@ -17,7 +17,11 @@ const char* ON_CODE = "KEY_POWER";
 const char* STANDBY_CODE = "KEY_POWER2";
 const char* IR_SEND_START = "SEND_START";
 const char* IR_SEND_STOP = "SEND_STOP";
+// The amount of time to repeat a blasted IR code.
 const int IR_REPEAT_MS = 300;
+// The amount of time to wait between blasting a repeated standby code to the projector.
+// The JVC projector shows a confirmation screen the first time it receives a standby command.
+// Actually putting the projector into standby requires confirming by sending standby again.
 const int TV_OFF_REPEAT_GAP_S = 1;
 
 
