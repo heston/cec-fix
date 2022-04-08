@@ -13,6 +13,7 @@ using namespace std;
 
 bool tv_is_on = 0;
 int fd;
+bool want_run = true;
 const char* REMOTE_NAME = "JVCNX7";
 const char* ON_CODE = "KEY_POWER";
 const char* STANDBY_CODE = "KEY_POWER2";
@@ -461,6 +462,17 @@ void cleanupLIRC() {
 }
 
 /**
+ * Catch SIGINT and set running state of program to false.
+ *
+ * @param   int   s  Not used
+ *
+ * @return  void
+ */
+void handleSIGINT(int s) {
+	want_run = false;
+}
+
+/**
  * Bootstrap all the things!
  *
  * @param   int   argc  Not used
@@ -483,18 +495,17 @@ int main(int argc, char *argv[]) {
 
 	atexit(cleanupLIRC);
 
-	// // Close socket to LIRC daemon when program exits
-	// struct sigaction sigIntHandler;
-	// sigIntHandler.sa_handler = cleanupLIRC;
-	// sigemptyset(&sigIntHandler.sa_mask);
-	// sigIntHandler.sa_flags = 0;
-	// sigaction(SIGINT, &sigIntHandler, NULL);
+	// Handle SIGNINT cleanly
+	struct sigaction sigIntHandler;
+	sigIntHandler.sa_handler = handleSIGINT;
+	sigemptyset(&sigIntHandler.sa_mask);
+	sigIntHandler.sa_flags = 0;
+	sigaction(SIGINT, &sigIntHandler, NULL);
 
 	spdlog::info("Running! Press CTRL-c to exit.");
 
-	while (true) {
-		pause();
-		// this_thread::sleep_for(chrono::seconds(1));
+	while (want_run) {
+		this_thread::sleep_for(chrono::seconds(1));
 	}
 
 	return 0;
