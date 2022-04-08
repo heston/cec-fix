@@ -4,6 +4,8 @@
 #include <thread>         // this_thread::sleep_for
 #include <chrono>         // chrono::seconds
 #include <spdlog/spdlog.h>
+#include <string.h>
+#include <signal.h>
 #include "lirc_client.h"
 
 using namespace std;
@@ -13,9 +15,65 @@ int fd;
 const char* REMOTE_NAME = "JVCNX7";
 const char* ON_CODE = "KEY_POWER";
 const char* STANDBY_CODE = "KEY_POWER2";
+const char* IR_SEND_START = "SEND_START";
+const char* IR_SEND_STOP = "SEND_STOP";
+const int IR_REPEAT_MS = 300;
+const int TV_OFF_REPEAT_GAP_S = 1;
+
+
+/**
+ * Send a LIRC context/packet/message to the LIRC daemon.
+ * 
+ * @param lirc_cmd_ctx* ctx The LIRC context containing the packet to send.
+ *
+ * @return  bool    True if the packet was sent successfully.
+ */
+bool send_ir_packet(lirc_cmd_ctx* ctx) {
+	int r;
+	do {
+			r = lirc_command_run(ctx, fd);
+			if (r != 0 && r != EAGAIN) {
+				spdlog::error("Error running command: {}", strerror(r));
+				return false;
+			}
+	} while (r == EAGAIN);
+	return r == 0 ? true : false;
+}
+
+/**
+ * Send a directive to LIRC via lirc-client.
+ * 
+ * Possible directives are:
+ *  - SEND_ONCE: Send a remote code exactly once.
+ *  - SEND_START: Start sending a remote code on repeat.
+ *  - SEND_STOP: Stop sending the remote code that was previously sent with SEND_START.
+ *
+ * @param   char  directive  One of the values listed above.
+ * @param   char  code       A remote code listed in the LIRC remote conf file.
+ *
+ * @return  bool             True if the command was sent successfully
+ */
+bool sendLIRCCommand(char* directive, char* code) {
+	int r;
+	lirc_cmd_ctx ctx;
+	r = lirc_command_init(&ctx, "%s %s %s\n", directive, REMOTE_NAME, code);
+
+	if (r != 0) {
+		spdlog::error("lirc_command_init: input too long");
+			return false;
+	}
+	lirc_command_reply_to_stdout(&ctx);
+	if (send_ir_packet(&ctx) == -1) {
+		spdlog::error("Error sending IR packet");
+		return false;
+	}
+	return true;
+}
 
 /**
  * Send an IR codename to the default remote.
+ * 
+ * Internally, this sends a command on repeat for ~300ms.
  *
  * @param   char  codename  Name of the remote code to send, as defined in the LIRC config file.
  *
@@ -27,14 +85,24 @@ bool blastIR(const char *codename) {
 		return false;
 	}
 
-	int result = lirc_send_one(fd, REMOTE_NAME, codename);
-	if (-1 == result) {
-		spdlog::error("Unable to send LIRC command `{}` to remote `{}`. Result code: {}.", codename, REMOTE_NAME, result);
+	char* directive_start = strdup(IR_SEND_START);
+	char* directive_stop = strdup(IR_SEND_STOP);
+	char* code = strdup(codename);
+
+	if(!sendLIRCCommand(directive_start, code)) {
+		spdlog::error("Unable to send LIRC command `{}` to remote `{}`", codename, REMOTE_NAME);
 		return false;
-	} else {
-		spdlog::info("Sent LIRC command `{}` to remote `{}`", codename, REMOTE_NAME);
-		return true;
 	}
+
+	this_thread::sleep_for(chrono::milliseconds(IR_REPEAT_MS));
+
+	if(!sendLIRCCommand(directive_stop, code)) {
+		spdlog::error("Unable to send LIRC command `{}` to remote `{}`", codename, REMOTE_NAME);
+		return false;
+	}
+
+	spdlog::info("Sent LIRC command `{}` to remote `{}`", codename, REMOTE_NAME);
+	return true;
 }
 
 /**
@@ -50,7 +118,7 @@ void turnOffTV() {
 	spdlog::info("Turning off the TV");
 	// JVC projector requires two Standby commands in a row, with a pause in between.
 	bool ret1 = blastIR(STANDBY_CODE);
-	this_thread::sleep_for (chrono::seconds(1));
+	this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
 	bool ret2 = blastIR(STANDBY_CODE);
 	if(ret1 && ret2) {
 		tv_is_on = false;
@@ -378,6 +446,15 @@ bool initLIRC() {
 }
 
 /**
+ * Close the file descriptor to the LIRC daemon socket.
+ *
+ * @return  void
+ */
+void cleanupLIRC(int s) {
+	close(fd);
+}
+
+/**
  * Bootstrap all the things!
  *
  * @param   int   argc  Not used
@@ -398,10 +475,18 @@ int main(int argc, char *argv[]) {
 		return 2;
 	}
 
+	// Close socket to LIRC daemon when program exits
+	struct sigaction sigIntHandler;
+	sigIntHandler.sa_handler = cleanupLIRC;
+	sigemptyset(&sigIntHandler.sa_mask);
+	sigIntHandler.sa_flags = 0;
+	sigaction(SIGINT, &sigIntHandler, NULL);
+
 	spdlog::info("Running! Press CTRL-c to exit.");
 
 	while (true) {
-		this_thread::sleep_for(chrono::seconds(1));
+		pause();
+		// this_thread::sleep_for(chrono::seconds(1));
 	}
 
 	return 0;
