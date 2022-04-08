@@ -63,7 +63,7 @@ bool sendLIRCCommand(char* directive, char* code) {
 			return false;
 	}
 	lirc_command_reply_to_stdout(&ctx);
-	if (send_ir_packet(&ctx) == -1) {
+	if (!send_ir_packet(&ctx)) {
 		spdlog::error("Error sending IR packet");
 		return false;
 	}
