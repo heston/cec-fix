@@ -442,11 +442,11 @@ bool initCEC() {
 bool initLIRC() {
 	fd = lirc_get_local_socket(NULL, 0);
 	if (fd < 0) {
-		spdlog::critical("Failed to open socket to LIRC");
+		spdlog::critical("Failed to connect to LIRC daemon socket");
 		return false;
 	}
 
-	spdlog::debug("LIRC socket established");
+	spdlog::debug("Connected to LIRC daemon socket");
 	return true;
 }
 
@@ -457,6 +457,7 @@ bool initLIRC() {
  */
 void cleanupLIRC() {
 	close(fd);
+	spdlog::debug("Disconnected from LIRC daemon socket");
 }
 
 /**
