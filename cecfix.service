@@ -1,6 +1,6 @@
 [Unit]
 Description=CEC Fix
-After=lircd.service
+After=multi-user.target
 
 [Service]
 Type=idle
@@ -10,4 +10,4 @@ RestartSec=5
 KillSignal=SIGINT
 
 [Install]
-WantedBy=lircd.service
+WantedBy=multi-user.target

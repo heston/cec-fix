@@ -19,9 +19,6 @@ const char* ON_CODE = "KEY_POWER";
 const char* STANDBY_CODE = "KEY_POWER2";
 const char* IR_SEND_START = "SEND_START";
 const char* IR_SEND_STOP = "SEND_STOP";
-const char* IR_SEND_ONCE = "SEND_ONCE";
-// The number of times to repeat each IR command
-const int IR_REPEAT_COUNT = 5;
 // The amount of time to repeat a blasted IR code.
 const int IR_REPEAT_MS = 300;
 // The amount of time to wait between blasting a repeated standby code to the projector.
@@ -62,14 +59,10 @@ bool send_ir_packet(lirc_cmd_ctx* ctx) {
  *
  * @return  bool             True if the command was sent successfully
  */
-bool sendLIRCCommand(char* directive, char* code, uint8_t repeats) {
+bool sendLIRCCommand(char* directive, char* code) {
 	int r;
 	lirc_cmd_ctx ctx;
-	if (directive == IR_SEND_ONCE && repeats) {
-		r = lirc_command_init(&ctx, "%s %s %s %s\n", directive, REMOTE_NAME, code, repeats);
-	} else {
-		r = lirc_command_init(&ctx, "%s %s %s\n", directive, REMOTE_NAME, code);
-	}
+	r = lirc_command_init(&ctx, "%s %s %s\n", directive, REMOTE_NAME, code);
 
 	if (r != 0) {
 		spdlog::error("lirc_command_init: input too long");
@@ -98,12 +91,18 @@ bool blastIR(const char *codename) {
 		return false;
 	}
 
-	// char* directive_start = strdup(IR_SEND_START);
-	// char* directive_stop = strdup(IR_SEND_STOP);
-	char* directive_send = strdup(IR_SEND_ONCE);
+	char* directive_start = strdup(IR_SEND_START);
+	char* directive_stop = strdup(IR_SEND_STOP);
 	char* code = strdup(codename);
 
-	if(!sendLIRCCommand(directive_send, code, IR_REPEAT_COUNT)) {
+	if(!sendLIRCCommand(directive_start, code)) {
+		spdlog::error("Unable to send LIRC command `{}` to remote `{}`", codename, REMOTE_NAME);
+		return false;
+	}
+
+	this_thread::sleep_for(chrono::milliseconds(IR_REPEAT_MS));
+
+	if(!sendLIRCCommand(directive_stop, code)) {
 		spdlog::error("Unable to send LIRC command `{}` to remote `{}`", codename, REMOTE_NAME);
 		return false;
 	}
@@ -124,13 +123,11 @@ void turnOffTV() {
 	}
 	spdlog::info("Turning off the TV");
 	// JVC projector requires two Standby commands in a row, with a pause in between.
-	if(blastIR(STANDBY_CODE)) {
-		this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
-		if(blastIR(STANDBY_CODE)) {
-			tv_is_on = false;
-			// Give the projector time to respond before returning.
-			this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
-		}
+	bool ret1 = blastIR(STANDBY_CODE);
+	this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
+	bool ret2 = blastIR(STANDBY_CODE);
+	if(ret1 && ret2) {
+		tv_is_on = false;
 	}
 }
 
@@ -148,8 +145,6 @@ void turnOnTV() {
 	spdlog::info("Turning on the TV");
 	if(blastIR(ON_CODE)) {
 		tv_is_on = true;
-		// Give the projector time to respond before returning.
-		this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
 	}
 }
 
@@ -336,6 +331,7 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 	if (isImageViewOn(message)) {
 		spdlog::info("ImageViewOn message received.");
 		turnOnTV();
+		// This will result in the audio system sending us back a message
 		return;
 	}
 
