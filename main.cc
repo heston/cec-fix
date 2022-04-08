@@ -1,11 +1,12 @@
 #include <bcm_host.h>
 #include <iostream>
 #include <unistd.h>
+#include <stdlib.h>
 #include <thread>         // this_thread::sleep_for
 #include <chrono>         // chrono::seconds
 #include <spdlog/spdlog.h>
 #include <string.h>
-#include <signal.h>
+// #include <signal.h>
 #include "lirc_client.h"
 
 using namespace std;
@@ -454,7 +455,7 @@ bool initLIRC() {
  *
  * @return  void
  */
-void cleanupLIRC(int s) {
+void cleanupLIRC() {
 	close(fd);
 }
 
@@ -479,12 +480,14 @@ int main(int argc, char *argv[]) {
 		return 2;
 	}
 
-	// Close socket to LIRC daemon when program exits
-	struct sigaction sigIntHandler;
-	sigIntHandler.sa_handler = cleanupLIRC;
-	sigemptyset(&sigIntHandler.sa_mask);
-	sigIntHandler.sa_flags = 0;
-	sigaction(SIGINT, &sigIntHandler, NULL);
+	atexit(cleanupLIRC);
+
+	// // Close socket to LIRC daemon when program exits
+	// struct sigaction sigIntHandler;
+	// sigIntHandler.sa_handler = cleanupLIRC;
+	// sigemptyset(&sigIntHandler.sa_mask);
+	// sigIntHandler.sa_flags = 0;
+	// sigaction(SIGINT, &sigIntHandler, NULL);
 
 	spdlog::info("Running! Press CTRL-c to exit.");
 
