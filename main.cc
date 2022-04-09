@@ -20,16 +20,16 @@ const char* STANDBY_CODE = "KEY_POWER2";
 const char* IR_SEND_START = "SEND_START";
 const char* IR_SEND_STOP = "SEND_STOP";
 // The amount of time to repeat a blasted IR code.
-const int IR_REPEAT_MS = 1000;
+const int IR_REPEAT_MS = 2000;
 // The amount of time to wait between blasting a repeated standby code to the projector.
 // The JVC projector shows a confirmation screen the first time it receives a standby command.
 // Actually putting the projector into standby requires confirming by sending standby again.
-const int TV_OFF_REPEAT_GAP_S = 1;
+const int TV_OFF_REPEAT_GAP_S = 3;
 
 
 /**
  * Send a LIRC context/packet/message to the LIRC daemon.
- * 
+ *
  * @param lirc_cmd_ctx* ctx The LIRC context containing the packet to send.
  *
  * @return  bool    True if the packet was sent successfully.
@@ -48,7 +48,7 @@ bool send_ir_packet(lirc_cmd_ctx* ctx) {
 
 /**
  * Send a directive to LIRC via lirc-client.
- * 
+ *
  * Possible directives are:
  *  - SEND_ONCE: Send a remote code exactly once.
  *  - SEND_START: Start sending a remote code on repeat.
@@ -78,7 +78,7 @@ bool sendLIRCCommand(char* directive, char* code) {
 
 /**
  * Send an IR codename to the default remote.
- * 
+ *
  * Internally, this sends a command on repeat for ~300ms.
  *
  * @param   char  codename  Name of the remote code to send, as defined in the LIRC config file.
