@@ -37,6 +37,7 @@ const int TV_OFF_REPEAT_GAP_S = 3;
 bool send_ir_packet(lirc_cmd_ctx* ctx) {
 	int r;
 	do {
+		spdlog::info("Running LIRC command: {}", ctx->packet);
 		r = lirc_command_run(ctx, fd);
 		if (r != 0 && r != EAGAIN) {
 			spdlog::error("Error running command: {}", strerror(r));
@@ -68,11 +69,13 @@ bool sendLIRCCommand(char* directive, char* code) {
 		spdlog::error("lirc_command_init: input too long");
 			return false;
 	}
-	lirc_command_reply_to_stdout(&ctx);
+	// lirc_command_reply_to_stdout(&ctx);
 	if (!send_ir_packet(&ctx)) {
-		spdlog::error("Error sending IR packet");
+		spdlog::error("Error sending IR packet: {}", ctx->packet);
 		return false;
 	}
+
+	spdlog::info("LIRC command '{}' run successfully: {}", ctx->packet, ctx->reply);
 	return true;
 }
 
