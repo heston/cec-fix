@@ -8,7 +8,7 @@
 
 using namespace std;
 
-int outPin = GPIO_19;       // The Broadcom pin number the signal will be sent on
+int outPin = GPIO::PIN19;        // The Broadcom pin number the signal will be sent on
 int frequency = 37900;           // The frequency of the IR signal in Hz
 double dutyCycle = 0.33;         // The duty cycle of the IR signal.
 int leadingPulseDuration = 8440; // The duration of the beginning pulse in microseconds
