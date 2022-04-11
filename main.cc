@@ -7,114 +7,17 @@
 #include "spdlog/spdlog.h"
 #include <string.h>
 #include <signal.h>
-#include "lirc_client.h"
+#include "ir.hpp"
 
 using namespace std;
 
 bool tv_is_on = 0;
-int fd;
 bool want_run = true;
-const char* REMOTE_NAME = "JVCNX7";
-const char* ON_CODE = "KEY_POWER";
-const char* STANDBY_CODE = "KEY_POWER2";
-const char* IR_SEND_START = "SEND_START";
-const char* IR_SEND_STOP = "SEND_STOP";
-// The amount of time to repeat a blasted IR code.
-const int IR_REPEAT_MS = 2000;
+
 // The amount of time to wait between blasting a repeated standby code to the projector.
 // The JVC projector shows a confirmation screen the first time it receives a standby command.
 // Actually putting the projector into standby requires confirming by sending standby again.
 const int TV_OFF_REPEAT_GAP_S = 3;
-
-
-/**
- * Send a LIRC context/packet/message to the LIRC daemon.
- *
- * @param lirc_cmd_ctx* ctx The LIRC context containing the packet to send.
- *
- * @return  bool    True if the packet was sent successfully.
- */
-bool send_ir_packet(lirc_cmd_ctx* ctx) {
-	int r;
-	do {
-		spdlog::info("Running LIRC command: {}", ctx->packet);
-		r = lirc_command_run(ctx, fd);
-		if (r != 0 && r != EAGAIN) {
-			spdlog::error("Error running command: {}", strerror(r));
-			return false;
-		}
-	} while (r == EAGAIN);
-	return r == 0 ? true : false;
-}
-
-/**
- * Send a directive to LIRC via lirc-client.
- *
- * Possible directives are:
- *  - SEND_ONCE: Send a remote code exactly once.
- *  - SEND_START: Start sending a remote code on repeat.
- *  - SEND_STOP: Stop sending the remote code that was previously sent with SEND_START.
- *
- * @param   char  directive  One of the values listed above.
- * @param   char  code       A remote code listed in the LIRC remote conf file.
- *
- * @return  bool             True if the command was sent successfully
- */
-bool sendLIRCCommand(char* directive, char* code) {
-	int r;
-	lirc_cmd_ctx ctx;
-	r = lirc_command_init(&ctx, "%s %s %s\n", directive, REMOTE_NAME, code);
-
-	if (r != 0) {
-		spdlog::error("lirc_command_init: input too long");
-			return false;
-	}
-	// lirc_command_reply_to_stdout(&ctx);
-	if (!send_ir_packet(&ctx)) {
-		spdlog::error("Error sending IR packet: {}", ctx->packet);
-		return false;
-	}
-
-	spdlog::info("LIRC command '{}' run successfully: {}", ctx->packet, ctx->reply);
-	return true;
-}
-
-/**
- * Send an IR codename to the default remote.
- *
- * Internally, this sends a command on repeat for ~300ms.
- *
- * @param   char  codename  Name of the remote code to send, as defined in the LIRC config file.
- *
- * @return  bool            true if the command was sent successfully, false otherwise.
- */
-bool blastIR(const char *codename) {
-	if (fd < 0) {
-		spdlog::error("No LIRC socket available!");
-		return false;
-	}
-
-	char* directive_start = strdup(IR_SEND_START);
-	char* directive_stop = strdup(IR_SEND_STOP);
-	char* code = strdup(codename);
-
-	if(!sendLIRCCommand(directive_start, code)) {
-		spdlog::error("Unable to send LIRC command `{}` to remote `{}`", codename, REMOTE_NAME);
-		return false;
-	}
-
-	this_thread::sleep_for(chrono::milliseconds(IR_REPEAT_MS));
-
-	if(!sendLIRCCommand(directive_stop, code)) {
-		spdlog::error("Unable to send LIRC command `{}` to remote `{}`", codename, REMOTE_NAME);
-		return false;
-	}
-
-	this_thread::sleep_for(chrono::milliseconds(IR_REPEAT_MS));
-
-	spdlog::info("Sent LIRC command `{}` to remote `{}`", codename, REMOTE_NAME);
-	return true;
-}
 
 /**
  * Turn off the TV by sending the correct IR sequence.
@@ -128,9 +31,9 @@ void turnOffTV() {
 	}
 	spdlog::info("Turning off the TV");
 	// JVC projector requires two Standby commands in a row, with a pause in between.
-	if(blastIR(STANDBY_CODE)) {
+	if(turnOff() == 0) {
 		this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
-		if(blastIR(STANDBY_CODE)) {
+		if(turnOff() == 0) {
 			tv_is_on = false;
 			this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
 		}
@@ -149,7 +52,7 @@ void turnOnTV() {
 	}
 
 	spdlog::info("Turning on the TV");
-	if(blastIR(ON_CODE)) {
+	if(turnOn() == 0) {
 		tv_is_on = true;
 		this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
 	}
