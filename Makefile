@@ -1,8 +1,8 @@
 cec-fix: main.cc ir
-	g++ -Wall -I include -I /usr/include -I /opt/vc/include -L /opt/vc/lib -L /usr/lib -l bcm_host -l vchiq_arm -l vcos -p thread /usr/lib/arm-linux-gnueabihf/liblirc_client.so main.cc -o build/cec-fix
+	g++ -Wall -I include -I /usr/include -I /opt/vc/include -L /opt/vc/lib -L /usr/lib -l bcm_host -l vchiq_arm -l vcos -p thread main.cc -o build/cec-fix
 
 ir: ir.cpp
-	g++ -Wall -I include -l m -l pigpio ir.cpp -o build/ir
+	g++ -Wall -I include -I /usr/include -l m -l pigpio ir.cpp -o build/ir
 
 clean:
 	rm cec-fix

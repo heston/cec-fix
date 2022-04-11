@@ -63,6 +63,6 @@ int turnOn();
  *
  * @return  int     0 if successful, < 0 otherwise.
  */
-int turnOff():
+int turnOff();
 
 #endif
