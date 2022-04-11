@@ -17,13 +17,13 @@ const int onePulse = 527;              // The duration of a pulse in microsecond
 const int zeroPulse = 527;             // The duration of a pulse in microseconds when sending a logical 0
 const int oneGap = 1583;               // The duration of the gap in microseconds when sending a logical 1
 const int zeroGap = 528;               // The duration of the gap in microseconds when sending a logical 0
-const int sendTrailingPulse = 1;       // 1 = Send a trailing pulse with duration equal to "onePulse"
-const int repeatCount = 7;
+const int sendTrailingPulse = 0;       // 1 = Send a trailing pulse with duration equal to "onePulse"
+const int repeatCount = 10;
 const int maxCommandSize = 512;
 
-int ADDRESS = 0xCE;  // Address of JVC NX7 projector
-int ON_COMMAND = 0xA0;  // Command to turn on
-int STANDBY_COMMAND = 0x60;  // Command to turn off
+const int ADDRESS = 0xCE;  // Address of JVC NX7 projector
+const int ON_COMMAND = 0xA0;  // Command to turn on
+const int STANDBY_COMMAND = 0x60;  // Command to turn off
 
 int getIRCode(int command, char * code) {
     // A valid IR code should repeat the command repeatCount times,
@@ -47,6 +47,8 @@ int getIRCode(int command, char * code) {
     int num_zeros = space / zeroLen;
 
     for (int i = 0; i < num_zeros; i++) {
+        // Special code indicating only a gap should be transmitted.
+        // Duration is zeroPulse + zeroGap (a 0 pulse interval).
         binary += "-";
     }
 
