@@ -199,6 +199,9 @@ static inline int irSling(uint32_t outPin,
 			carrierFrequency(outPin, frequency, dutyCycle, onePulse, irSignal, &pulseCount);
 			gap(outPin, oneGap, irSignal, &pulseCount);
 		}
+		else if (code[i] == '-') {
+			gap(outPin, zeroPulse + zeroGap, irSignal, &pulseCount);
+		}
 		else
 		{
 			printf("Warning: Non-binary digit in command\n");

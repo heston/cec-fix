@@ -8,25 +8,25 @@
 
 using namespace std;
 
-int outPin = GPIO::PIN19;        // The Broadcom pin number the signal will be sent on
-int frequency = 37900;           // The frequency of the IR signal in Hz
-double dutyCycle = 0.33;         // The duty cycle of the IR signal.
-int leadingPulseDuration = 8440; // The duration of the beginning pulse in microseconds
-int leadingGapDuration = 4220;   // The duration of the gap in microseconds after the leading pulse
-int onePulse = 527;              // The duration of a pulse in microseconds when sending a logical 1
-int zeroPulse = 527;             // The duration of a pulse in microseconds when sending a logical 0
-int oneGap = 1583;               // The duration of the gap in microseconds when sending a logical 1
-int zeroGap = 528;               // The duration of the gap in microseconds when sending a logical 0
-int sendTrailingPulse = 1;       // 1 = Send a trailing pulse with duration equal to "onePulse"
-int repeatCount = 7;
-const int maxCommandSize = 255;
+const int outPin = GPIO::PIN19;        // The Broadcom pin number the signal will be sent on
+const int frequency = 37900;           // The frequency of the IR signal in Hz
+const double dutyCycle = 0.33;         // The duty cycle of the IR signal.
+const int leadingPulseDuration = 8440; // The duration of the beginning pulse in microseconds
+const int leadingGapDuration = 4220;   // The duration of the gap in microseconds after the leading pulse
+const int onePulse = 527;              // The duration of a pulse in microseconds when sending a logical 1
+const int zeroPulse = 527;             // The duration of a pulse in microseconds when sending a logical 0
+const int oneGap = 1583;               // The duration of the gap in microseconds when sending a logical 1
+const int zeroGap = 528;               // The duration of the gap in microseconds when sending a logical 0
+const int sendTrailingPulse = 1;       // 1 = Send a trailing pulse with duration equal to "onePulse"
+const int repeatCount = 7;
+const int maxCommandSize = 512;
 
 int ADDRESS = 0xCE;  // Address of JVC NX7 projector
 int ON_COMMAND = 0xA0;  // Command to turn on
 int STANDBY_COMMAND = 0x60;  // Command to turn off
 
 int getIRCode(int command, char * code) {
-    // A valid IR code should repeat the command three times,
+    // A valid IR code should repeat the command repeatCount times,
     // padding the end of each command with enough space to fill the frame.
     string address = bitset<8>(ADDRESS).to_string();
     string cmd = bitset<8>(command).to_string();
@@ -42,11 +42,12 @@ int getIRCode(int command, char * code) {
     }
     
     int zeroLen = zeroPulse + zeroGap;
-    int space = (46420 - 16880 - 5270 - (numOnes * zeroLen));
+    // http://support.jvc.com/consumer/support/documents/RemoteCodes.pdf
+    int space = (46420 - 16880 - 527 - (numOnes * zeroLen));
     int num_zeros = space / zeroLen;
 
     for (int i = 0; i < num_zeros; i++) {
-        binary += "0";
+        binary += "-";
     }
 
     spdlog::debug("Padding: space={} numZeros={} binary={}", space, num_zeros, binary);
