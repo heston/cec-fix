@@ -21,9 +21,9 @@ const int sendTrailingPulse = 0;       // 1 = Send a trailing pulse with duratio
 const int repeatCount = 10;
 const int maxCommandSize = 512;
 
-const int ADDRESS = 0xCE;  // Address of JVC NX7 projector
-const int ON_COMMAND = 0xA0;  // Command to turn on
-const int STANDBY_COMMAND = 0x60;  // Command to turn off
+const int ADDRESS = 0x73;  // Address of JVC NX7 projector
+const int ON_COMMAND = 0x05;  // Command to turn on
+const int STANDBY_COMMAND = 0x06;  // Command to turn off
 
 int getIRCode(int command, char * code) {
     // A valid IR code should repeat the command repeatCount times,
