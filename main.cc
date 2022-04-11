@@ -346,32 +346,6 @@ bool initCEC() {
 }
 
 /**
- * Set up LIRC socket.
- *
- * @return  bool    Whether the socket was established.
- */
-bool initLIRC() {
-	fd = lirc_get_local_socket(NULL, 0);
-	if (fd < 0) {
-		spdlog::critical("Failed to connect to LIRC daemon socket");
-		return false;
-	}
-
-	spdlog::debug("Connected to LIRC daemon socket");
-	return true;
-}
-
-/**
- * Close the file descriptor to the LIRC daemon socket.
- *
- * @return  void
- */
-void cleanupLIRC() {
-	close(fd);
-	spdlog::debug("Disconnected from LIRC daemon socket");
-}
-
-/**
  * Catch SIGINT and set running state of program to false.
  *
  * @param   int   s  Not used
@@ -398,12 +372,6 @@ int main(int argc, char *argv[]) {
 	if (!initCEC()) {
 		return 1;
 	}
-
-	if (!initLIRC()) {
-		return 2;
-	}
-
-	atexit(cleanupLIRC);
 
 	// Handle SIGINT cleanly
 	struct sigaction sigIntHandler;
