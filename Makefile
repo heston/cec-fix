@@ -1,11 +1,16 @@
-cec-fix: main.cc ir
+BUILD_DIR = ./build
+
+cec-fix: main.cc ir | $(OUT)/
 	g++ -Wall -I include -I /usr/include -I /opt/vc/include -L /opt/vc/lib -L /usr/lib -l bcm_host -l vchiq_arm -l vcos -p thread main.cc -o build/cec-fix
 
-ir: ir.cpp
+ir: ir.cpp | $(OUT)/
 	g++ -Wall -I include -I /usr/include -l m -l pigpio ir.cpp -o build/ir
 
+$(OUT)/:
+	mkdir -p $@
+
 clean:
-	rm cec-fix
+	rm $(BUILD_DIR)/*
 
 .PHONY: install
 install:

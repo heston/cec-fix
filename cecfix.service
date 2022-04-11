@@ -4,7 +4,7 @@ After=multi-user.target
 
 [Service]
 Type=idle
-ExecStart={{DIR}}/cec-fix
+ExecStart={{DIR}}/build/cec-fix
 Restart=always
 RestartSec=5
 KillSignal=SIGINT
