@@ -64,7 +64,14 @@ int getIRCode(int command, char * code) {
 int sendIRCommand(int command) {
     char code[255];
     getIRCode(command, code);
-    return irSling(
+    spdlog::debug(
+        "irSling: outPin={} frequency={} dutyCycle={} leadingPulseDuration={} "
+        "leadingGapDuration={} onePulse={} zeroPulse={} oneGap={} zeroGap={} sendTrailingPulse={} "
+        "code={}",
+        outPin, frequency, dutyCycle, leadingPulseDuration, leadingGapDuration, onePulse,
+        zeroPulse, oneGap, zeroGap, sendTrailingPulse, code
+    );
+    int ret = irSling(
         outPin,
         frequency,
         dutyCycle,
@@ -77,12 +84,18 @@ int sendIRCommand(int command) {
         sendTrailingPulse,
         code
     );
+    spdlog::debug("sendIRCommand({}) result: {}", command, ret);
+    return ret;
 }
 
 int turnOn() {
-    return sendIRCommand(ON_COMMAND);   
+    int ret = sendIRCommand(ON_COMMAND);
+    spdlog::debug("sendIRCommand(ON_COMMAND) result: {}", ret);
+    return ret;
 }
 
 int turnOff() {
-    return sendIRCommand(STANDBY_COMMAND);
+    int ret = sendIRCommand(STANDBY_COMMAND);
+    spdlog::debug("sendIRCommand(STANDBY_COMMAND) result: {}", ret);
+    return ret;
 }

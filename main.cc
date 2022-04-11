@@ -34,6 +34,7 @@ void turnOffTV() {
 	if(turnOff() == 0) {
 		this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
 		if(turnOff() == 0) {
+			spdlog::info("TV turned off");
 			tv_is_on = false;
 			this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
 		}
@@ -53,6 +54,7 @@ void turnOnTV() {
 
 	spdlog::info("Turning on the TV");
 	if(turnOn() == 0) {
+		spdlog::info("TV turned on");
 		tv_is_on = true;
 		this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
 	}
