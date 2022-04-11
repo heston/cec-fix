@@ -1,12 +1,12 @@
 BUILD_DIR = ./build
 
-cec-fix: main.cc ir | $(OUT)/
+cec-fix: main.cc ir | $(BUILD_DIR)/
 	g++ -Wall -I include -I /usr/include -I /opt/vc/include -L /opt/vc/lib -L /usr/lib -l bcm_host -l vchiq_arm -l vcos -p thread main.cc -o build/cec-fix
 
-ir: ir.cpp | $(OUT)/
+ir: ir.cpp | $(BUILD_DIR)/
 	g++ -Wall -I include -I /usr/include -l m -l pigpio ir.cpp -o build/ir
 
-$(OUT)/:
+$(BUILD_DIR)/:
 	mkdir -p $@
 
 clean:
