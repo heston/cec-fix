@@ -18,7 +18,8 @@ int zeroPulse = 527;             // The duration of a pulse in microseconds when
 int oneGap = 1583;               // The duration of the gap in microseconds when sending a logical 1
 int zeroGap = 528;               // The duration of the gap in microseconds when sending a logical 0
 int sendTrailingPulse = 1;       // 1 = Send a trailing pulse with duration equal to "onePulse"
-int repeatCount = 3;
+int repeatCount = 7;
+int maxCommandSize = 255;
 
 int ADDRESS = 0xCE;  // Address of JVC NX7 projector
 int ON_COMMAND = 0xA0;  // Command to turn on
@@ -56,14 +57,28 @@ int getIRCode(int command, char * code) {
     }
 
     output += address + cmd;
+    if (output.length() > maxCommandSize) {
+        spdlog::error(
+            "getIRCode error: output length ({}) would exceed max length of buffer ({})",
+            output.length(),
+            maxCommandSize
+        );
+        return 1;
+    }
+    
     strcpy(code, output.c_str());
 
     return 0;
 }
 
 int sendIRCommand(int command) {
-    char code[255];
-    getIRCode(command, code);
+    char code[maxCommandSize];
+    int ret = getIRCode(command, code);
+    if (ret != 0) {
+        spdlog::error("getIRCode error: {}", ret);
+        return ret;
+    }
+
     spdlog::debug(
         "irSling: outPin={} frequency={} dutyCycle={} leadingPulseDuration={} "
         "leadingGapDuration={} onePulse={} zeroPulse={} oneGap={} zeroGap={} sendTrailingPulse={} "
@@ -71,7 +86,8 @@ int sendIRCommand(int command) {
         outPin, frequency, dutyCycle, leadingPulseDuration, leadingGapDuration, onePulse,
         zeroPulse, oneGap, zeroGap, sendTrailingPulse, code
     );
-    int ret = irSling(
+
+    ret = irSling(
         outPin,
         frequency,
         dutyCycle,
