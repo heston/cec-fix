@@ -15,7 +15,7 @@ $(OBJDIR)/:
 	mkdir -p $@
 
 clean:
-	rm $(BUILD_DIR)/*
+	rm $(OBJDIR)/*
 
 .PHONY: install
 install:
