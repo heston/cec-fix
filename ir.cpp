@@ -19,7 +19,7 @@ int oneGap = 1583;               // The duration of the gap in microseconds when
 int zeroGap = 528;               // The duration of the gap in microseconds when sending a logical 0
 int sendTrailingPulse = 1;       // 1 = Send a trailing pulse with duration equal to "onePulse"
 int repeatCount = 7;
-int maxCommandSize = 255;
+const int maxCommandSize = 255;
 
 int ADDRESS = 0xCE;  // Address of JVC NX7 projector
 int ON_COMMAND = 0xA0;  // Command to turn on
