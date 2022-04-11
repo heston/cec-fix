@@ -176,7 +176,7 @@ static inline int irSling(uint32_t outPin,
 	if (codeLen > MAX_COMMAND_SIZE)
 	{
 		// Command is too big
-		return 1;
+		return 2;
 	}
 
 	gpioPulse_t irSignal[MAX_PULSES];
