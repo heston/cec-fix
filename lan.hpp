@@ -37,4 +37,30 @@ int sendOn();
  */
 int sendOff();
 
+/**
+ * Whether the host is POWER_ON or WARMING mode.
+ *
+ * @return  bool
+ */
+bool isOn();
+
+/**
+ * Whether the host is in STANDBY or COOLING mode.
+ *
+ * @return  bool    [return description]
+ */
+bool isOff();
+
+/**
+ * Get the power status of the host.
+ *
+ * @return  int     0: STANDBY
+ *                  1: POWER_ON
+ *                  2: COOLING
+ *                  3: WARMING
+ *                  4: EMERGENCY
+ *                 -1: Unknown status
+ */
+int queryPowerStatus();
+
 #endif

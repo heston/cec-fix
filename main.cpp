@@ -22,7 +22,6 @@ void turnOffTV() {
 		return;
 	}
 	spdlog::info("Turning off the TV");
-	// JVC projector requires two Standby commands in a row, with a pause in between.
 	if(sendOff() == 0) {
 		spdlog::info("TV turned off");
 	}
@@ -42,7 +41,6 @@ void turnOnTV() {
 	spdlog::info("Turning on the TV");
 	if(sendOn() == 0) {
 		spdlog::info("TV turned on");
-		tv_is_on = true;
 	}
 }
 
@@ -146,6 +144,7 @@ bool isRequestForPowerStatus(VC_CEC_MESSAGE_T &message) {
  * @return  void
  */
 void replyWithPowerStatus(int requestor) {
+	bool tv_is_on = isOn();
 	spdlog::info("Replying with power status: {}", tv_is_on);
 	uint8_t bytes[2];
 	bytes[0] = CEC_Opcode_ReportPowerStatus;
