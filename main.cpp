@@ -7,17 +7,12 @@
 #include "spdlog/spdlog.h"
 #include <string.h>
 #include <signal.h>
-#include "ir.hpp"
+#include "lan.hpp"
 
 using namespace std;
 
 bool tv_is_on = 0;
 bool want_run = true;
-
-// The amount of time to wait between blasting a repeated standby code to the projector.
-// The JVC projector shows a confirmation screen the first time it receives a standby command.
-// Actually putting the projector into standby requires confirming by sending standby again.
-const int TV_OFF_REPEAT_GAP_S = 3;
 
 /**
  * Turn off the TV by sending the correct IR sequence.
@@ -25,19 +20,16 @@ const int TV_OFF_REPEAT_GAP_S = 3;
  * @return  void
  */
 void turnOffTV() {
+	// TODO: Check projector power status by querying it
 	if (!tv_is_on) {
 		spdlog::info("TV is already off!");
 		return;
 	}
 	spdlog::info("Turning off the TV");
 	// JVC projector requires two Standby commands in a row, with a pause in between.
-	if(turnOff() == 0) {
-		this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
-		if(turnOff() == 0) {
-			spdlog::info("TV turned off");
-			tv_is_on = false;
-			this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
-		}
+	if(sendOff() == 0) {
+		spdlog::info("TV turned off");
+		tv_is_on = false;
 	}
 }
 
@@ -47,16 +39,16 @@ void turnOffTV() {
  * @return  void
  */
 void turnOnTV() {
+	// TODO: Check projector power status by querying it
 	if (tv_is_on) {
 		spdlog::info("TV is already on!");
 		return;
 	}
 
 	spdlog::info("Turning on the TV");
-	if(turnOn() == 0) {
+	if(sendOn() == 0) {
 		spdlog::info("TV turned on");
 		tv_is_on = true;
-		this_thread::sleep_for(chrono::seconds(TV_OFF_REPEAT_GAP_S));
 	}
 }
 
@@ -370,6 +362,8 @@ void handleSIGINT(int s) {
  */
 int main(int argc, char *argv[]) {
 	spdlog::set_level(spdlog::level::debug); // Set global log level to debug
+
+	setHost(DEFAULT_HOST);
 
 	if (!initCEC()) {
 		return 1;

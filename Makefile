@@ -2,14 +2,20 @@ OBJDIR := build
 
 all: $(OBJDIR)/cec-fix | $(OBJDIR)/
 
-$(OBJDIR)/cec-fix: $(OBJDIR)/ir.o $(OBJDIR)/main.o | $(OBJDIR)/
-	g++ -Wall -L/opt/vc/lib -L/usr/lib -lbcm_host -lvchiq_arm -lvcos -lm -lpigpio -lpthread build/ir.o build/main.o -o build/cec-fix
+$(OBJDIR)/cec-fix: $(OBJDIR)/lan.o $(OBJDIR)/main.o | $(OBJDIR)/
+	g++ -Wall -L/opt/vc/lib -L/usr/lib -lbcm_host -lvchiq_arm -lvcos -lm -lpigpio -lpthread $(OBJDIR)/lan.o $(OBJDIR)/main.o -o $(OBJDIR)/cec-fix
 
 $(OBJDIR)/main.o: main.cpp | $(OBJDIR)/
-	g++ -Wall -c -I. -Iinclude -I/usr/include -I/opt/vc/include main.cpp -o build/main.o
+	g++ -Wall -c -I. -Iinclude -I/usr/include -I/opt/vc/include main.cpp -o $(OBJDIR)/main.o
 
 $(OBJDIR)/ir.o: ir.cpp | $(OBJDIR)/
-	g++ -Wall -c -Iinclude -I/usr/include ir.cpp -o build/ir.o
+	g++ -Wall -c -Iinclude -I/usr/include ir.cpp -o $(OBJDIR)/ir.o
+
+$(OBJDIR)/lan.o: lan.cpp | $(OBJDIR)/
+	g++ -Wall -c -Iinclude -I/usr/include lan.cpp -o $(OBJDIR)/lan.o
+
+$(OBJDIR)/lan-test: $(OBJDIR)/lan.o | $(OBJDIR)/
+	g++ -Wall $(OBJDIR)/lan.o -o $(OBJDIR)/lan-test
 
 $(OBJDIR)/:
 	mkdir -p $@

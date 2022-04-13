@@ -21,7 +21,7 @@ const int sendTrailingPulse = 0;       // 1 = Send a trailing pulse with duratio
 const int repeatCount = 10;
 const int maxCommandSize = 512;
 
-const int ADDRESS = 0x73;  // Address of JVC NX7 projector
+const int ADDRESS = 0x83;  // Address of JVC NX7 projector
 const int ON_COMMAND = 0x05;  // Command to turn on
 const int STANDBY_COMMAND = 0x06;  // Command to turn off
 
