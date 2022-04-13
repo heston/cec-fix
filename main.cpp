@@ -2,8 +2,6 @@
 #include <iostream>
 #include <unistd.h>
 #include <stdlib.h>
-#include <thread>         // this_thread::sleep_for
-#include <chrono>         // chrono::seconds
 #include "spdlog/spdlog.h"
 #include <string.h>
 #include <signal.h>
@@ -11,7 +9,6 @@
 
 using namespace std;
 
-bool tv_is_on = 0;
 bool want_run = true;
 
 /**
@@ -20,8 +17,7 @@ bool want_run = true;
  * @return  void
  */
 void turnOffTV() {
-	// TODO: Check projector power status by querying it
-	if (!tv_is_on) {
+	if (isOff()) {
 		spdlog::info("TV is already off!");
 		return;
 	}
@@ -29,7 +25,6 @@ void turnOffTV() {
 	// JVC projector requires two Standby commands in a row, with a pause in between.
 	if(sendOff() == 0) {
 		spdlog::info("TV turned off");
-		tv_is_on = false;
 	}
 }
 
@@ -39,8 +34,7 @@ void turnOffTV() {
  * @return  void
  */
 void turnOnTV() {
-	// TODO: Check projector power status by querying it
-	if (tv_is_on) {
+	if (isOn()) {
 		spdlog::info("TV is already on!");
 		return;
 	}
