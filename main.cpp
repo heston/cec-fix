@@ -344,6 +344,28 @@ void handleSIGINT(int s) {
 }
 
 /**
+ * Set the projector IP address from the command line args, is present.
+ *
+ * @param   int   argc  argc from main.
+ * @param   char  argv  argv from main.
+ *
+ * @return  bool        Whether LAN was configured successfully.
+ */
+bool initLAN(int argc, char *argv[]) {
+	if (argc == 1) {
+		// No host provided, use default
+		setHost(DEFAULT_HOST);
+	} else if (argc == 2) {
+		// Host provided
+		setHost(argv[1]);
+	} else {
+		spdlog::critical("Invalid invocation. First arg must be ip address of host, or omitted to use default.");
+		return false;
+	}
+	return true;
+}
+
+/**
  * Bootstrap all the things!
  *
  * @param   int   argc  Not used
@@ -351,12 +373,14 @@ void handleSIGINT(int s) {
  *
  * @return  int         0: process exited normally.
  * 						1: process exited due to critical CEC error.
- * 						2: process exited due to critical LIRC error.
+ * 						2: process exited due to critical LAN error.
  */
 int main(int argc, char *argv[]) {
 	spdlog::set_level(spdlog::level::debug); // Set global log level to debug
 
-	setHost(DEFAULT_HOST);
+	if (!initLAN(argc, argv)) {
+		return 2;
+	}
 
 	if (!initCEC()) {
 		return 1;

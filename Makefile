@@ -12,10 +12,10 @@ $(OBJDIR)/ir.o: ir.cpp | $(OBJDIR)/
 	g++ -Wall -c -Iinclude -I/usr/include ir.cpp -o $(OBJDIR)/ir.o
 
 $(OBJDIR)/lan.o: lan.cpp | $(OBJDIR)/
-	g++ -Wall -c -Iinclude -I/usr/include lan.cpp -o $(OBJDIR)/lan.o
+	g++ -Wall -c -I. -Iinclude -I/usr/include lan.cpp -o $(OBJDIR)/lan.o
 
 $(OBJDIR)/lan-test: $(OBJDIR)/lan.o | $(OBJDIR)/
-	g++ -Wall $(OBJDIR)/lan.o -o $(OBJDIR)/lan-test
+	g++ -Wall -I. -Iinclude lan-test.cpp $(OBJDIR)/lan.o -o $(OBJDIR)/lan-test
 
 $(OBJDIR)/:
 	mkdir -p $@

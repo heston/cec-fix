@@ -1,7 +1,7 @@
 Heston's cec-fix
 ================
 
-Some Raspberry Pi code that allows my Roku remote to control my home theater over HDMI-CEC and IR.
+Some Raspberry Pi code that allows my Roku remote to control my home theater over HDMI-CEC and TCP sockets.
 
 My Setup
 --------
@@ -25,15 +25,25 @@ the power key again, and have everything go into standby mode.
 
 I should only need the NAD and JVC remotes if I'm doing something unusual.
 
+Approach
+--------
+1. Make the Raspberry Pi pretend to be the TV (CEC logical address `0`), since Roku only sends power commands to the TV.
+1. Connect to JVC projector on LAN interface using a TCP socket (JVC projectors do not support CEC).
+1. Listen to CEC messages on the HDMI-CEC bus, and send messages back to the bus and projector.
+
+
 Resources
 ---------
 1. Raspberry Pi Zero W.
 1. The original [cec-fix](https://github.com/glywood/cec-fix).
-1. LIRC library set up using the Gist [prasanthj/lirc-pi3.txt](https://gist.github.com/prasanthj/c15a5298eb682bde34961c322c95378b).
-1. IR hardware and configuration using [How to Send and Receive IR Signals with a Raspberry Pi](https://www.digikey.com/en/maker/blogs/2021/how-to-send-and-receive-ir-signals-with-a-raspberry-pi). (In "production" I'm only sending IR signals, but I needed to receive them too during development in order to learn the correct JVC remote codes and test things.)
+1. [JVC Interface Specifications](https://support.jvc.com/consumer/support/support.jsp?pageID=11), specifically [JVC D-ILA® Projector RS232 / LAN / Infrared Remote Control Codes](https://support.jvc.com/consumer/support/documents/DILAremoteControlGuide.pdf) PDF.
 
 Installation
 ------------
-1. Ensure LIRC is configured according to the above guides.
-1. Download/compile/run on the raspberry pi itself, as it references some firmware libraries that are only available on the device. Just type 'make' to build it, then './cec-fix' to run.
-1. To set it up to run on boot, run, `sudo make install`.
+1. Download on the raspberry pi itself, as the build references firmware libraries that are only available on the Pi.
+1. `make` to build it, then `/build/cec-fix` to run. `CTRL-c` to exit.
+1. To run as a service on boot: `sudo make install`.
+
+Uninstalling
+------------
+`sudo make uninstall`

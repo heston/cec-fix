@@ -1,4 +1,3 @@
-// #define STANDALONE 1
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <string.h>
@@ -217,29 +216,3 @@ void setHost(const char * host) {
 void setHost(char * host) {
     strcpy(HOST, host);
 }
-
-#ifdef STANDALONE
-int main(int argc, char *argv[]) {
-    spdlog::set_pattern("[LAN] [%^%l%$] %v");
-    spdlog::set_level(spdlog::level::debug); // Set global log level to debug
-
-    if (argc == 1) {
-        // No host provided, use default
-        setHost(DEFAULT_HOST);
-    } else if (argc == 2) {
-        // Host provided
-        setHost(argv[1]);
-    } else {
-        spdlog::critical("Invalid invocation. First arg must be ip address of host, or omitted to use default.");
-        return -10;
-    }
-
-    // if (isOn()) {
-    //     sendOff();
-    // } else {
-    //     sendOn();
-    // }
-    queryPowerStatus();
-    return 0;
-}
-#endif
