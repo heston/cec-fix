@@ -36,12 +36,6 @@ const unsigned char EMERGENCY_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A, 0x40, 
 
 const unsigned char NULL_COMMAND[] {0x21, 0x89, 0x01, 0x00, 0x00, 0x0A};
 
-void logResponse(std::array<unsigned char, MAX_RESPONSE_SIZE> response, size_t responseLen) {
-    spdlog::debug(
-        "Received response from host: {:Xpn}",
-        spdlog::to_hex(std::begin(response), std::begin(response) + responseLen)
-    );
-}
 
 int sendCommand(const char* host, const unsigned char* code, int codeLen, unsigned char* response) {
     int sock { 0 };
@@ -49,6 +43,7 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
 
     char buffer[MAX_RESPONSE_SIZE] { 0 };
     std::array<unsigned char, MAX_RESPONSE_SIZE> response_buffer;
+
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         spdlog::error("Socket creation error");
         return -1;
@@ -100,6 +95,7 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
     // Clear buffer
     memset(buffer, 0, sizeof(buffer));
     send(sock, REQUEST, strlen(REQUEST), 0);
+
     if(read(sock, buffer, 4096) == -1) {
         spdlog::error("Socket read error");
         return -4;
@@ -112,18 +108,17 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
 
     send(sock, code, codeLen, 0);
 
-    // Clear buffer
-    memset(buffer, 0, sizeof(buffer));
-
     ssize_t respLen = read(sock, static_cast<void *>(&response_buffer), 4096);
     if( respLen == -1) {
         spdlog::error("Socket read error");
         return -4;
     }
-    logResponse(response_buffer, respLen);
 
+    spdlog::debug(
+        "Received response from host: {:Xpn}",
+        spdlog::to_hex(std::begin(response_buffer), std::begin(response_buffer) + respLen)
+    );
     memcpy(response, response_buffer.data(), respLen);
-
     close(sock);
     // Wait for host to close other end
     this_thread::sleep_for(chrono::seconds(1));
