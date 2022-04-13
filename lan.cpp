@@ -5,7 +5,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include "spdlog/spdlog.h"
+#include "spdlog/fmt/bin_to_hex.h"
 #include "socket_with_timeout.h"
+#include <thread>         // this_thread::sleep_for
+#include <chrono>         // chrono::seconds
 #include "lan.hpp"
 
 using namespace std;
@@ -20,17 +23,33 @@ char HOST[15];
 const int SOCK_TIMEOUT_S = 5;
 const int SOCK_TIMEOUT_MS = SOCK_TIMEOUT_S * 1000;
 const int MAX_RESPONSE_SIZE = 4096;
+
 const unsigned char ON_COMMAND[] { 0x21, 0x89, 0x01, 0x50, 0x57, 0x31, 0x0A };
 const unsigned char OFF_COMMAND[] { 0x21, 0x89, 0x01, 0x50, 0x57, 0x30, 0x0A };
+const unsigned char ON_OFF_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A };
+
 const unsigned char QUERY_POWER_COMMAND[] { 0x3F, 0x89, 0x01, 0x50, 0x57, 0x0A };
+const unsigned char STANDBY_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A, 0x40, 0x89, 0x01, 0x50, 0x57, 0x30, 0x0A };
+const unsigned char POWER_ON_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A, 0x40, 0x89, 0x01, 0x50, 0x57, 0x31, 0x0A };
+const unsigned char COOLING_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A, 0x40, 0x89, 0x01, 0x50, 0x57, 0x32, 0x0A };
+const unsigned char WARMING_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A, 0x40, 0x89, 0x01, 0x50, 0x57, 0x33, 0x0A };
+const unsigned char EMERGENCY_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A, 0x40, 0x89, 0x01, 0x50, 0x57, 0x34, 0x0A };
+
 const unsigned char NULL_COMMAND[] {0x21, 0x89, 0x01, 0x00, 0x00, 0x0A};
 
+void logResponse(std::array<unsigned char, MAX_RESPONSE_SIZE> response, size_t responseLen) {
+    spdlog::debug(
+        "Received response from host: {:Xpn}",
+        spdlog::to_hex(std::begin(response), std::begin(response) + responseLen)
+    );
+}
 
-int sendCommand(const char* host, const unsigned char* code, int codeLen, char* response) {
+int sendCommand(const char* host, const unsigned char* code, int codeLen, unsigned char* response) {
     int sock { 0 };
     struct sockaddr_in serv_addr;
 
     char buffer[MAX_RESPONSE_SIZE] { 0 };
+    std::array<unsigned char, MAX_RESPONSE_SIZE> response_buffer;
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         spdlog::error("Socket creation error");
         return -1;
@@ -97,58 +116,105 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, char* 
     // Clear buffer
     memset(buffer, 0, sizeof(buffer));
 
-    if(read(sock, buffer, 4096) == -1) {
+    ssize_t respLen = read(sock, static_cast<void *>(&response_buffer), 4096);
+    if( respLen == -1) {
         spdlog::error("Socket read error");
         return -4;
     }
-    spdlog::debug("Received response from host: {}", buffer);
+    logResponse(response_buffer, respLen);
 
-    strcpy(response, buffer);
+    memcpy(response, response_buffer.data(), respLen);
 
     close(sock);
-    return 0;
+    // Wait for host to close other end
+    this_thread::sleep_for(chrono::seconds(1));
+    return respLen;
 }
 
 int sendOn() {
     spdlog::info("Sending ON_COMMAND to host");
-    char response[MAX_RESPONSE_SIZE] { 0 };
+    unsigned char response[MAX_RESPONSE_SIZE] { 0 };
     const int cmdSize = sizeof(ON_COMMAND);
     int ret = sendCommand(HOST, ON_COMMAND, cmdSize, response);
     if(ret < 0) {
         spdlog::error("Error communicating with host: {}", ret);
+        return ret;;
     }
-    spdlog::info("Got reply from host: {}", response);
-    return ret;
+    return 0;
 }
 
 int sendOff() {
-    spdlog::info("Sending ON_COMMAND to host");
-    char response[MAX_RESPONSE_SIZE] { 0 };
+    spdlog::info("Sending OFF_COMMAND to host");
+    unsigned char response[MAX_RESPONSE_SIZE] { 0 };
     const int cmdSize = sizeof(OFF_COMMAND);
     int ret = sendCommand(HOST, OFF_COMMAND, cmdSize, response);
     if(ret < 0) {
         spdlog::error("Error communicating with host: {}", ret);
+        return ret;
     }
-    spdlog::info("Got reply from host: {}", response);
-    return ret;
+    return 0;
 }
 
 int sendNull() {
     spdlog::info("Sending NULL_COMMAND to host");
-    char response[MAX_RESPONSE_SIZE] { 0 };
+    unsigned char response[MAX_RESPONSE_SIZE] { 0 };
     const int cmdSize = sizeof(NULL_COMMAND);
     int ret = sendCommand(HOST, NULL_COMMAND, cmdSize, response);
     if(ret < 0) {
         spdlog::error("Error communicating with host: {}", ret);
-    } else {
-        spdlog::info("Got reply from host: {}", response);
+        return ret;
     }
-    return ret;
+    return 0;
 }
 
-// TODO: query power status and return result
+int queryPowerStatus() {
+    spdlog::info("Sending QUERY_POWER_COMMAND to host");
+    char unsigned response[MAX_RESPONSE_SIZE] { 0 };
+    const int cmdSize = sizeof(QUERY_POWER_COMMAND);
+    int ret = sendCommand(HOST, QUERY_POWER_COMMAND, cmdSize, response);
+    if(ret < 0) {
+        spdlog::error("Error communicating with host: {}", ret);
+    } else {
+        if(memcmp(response, STANDBY_ACK, sizeof(STANDBY_ACK)) == 0) {
+            spdlog::debug("Power status is STANDBY");
+            return 0;
+        }
+        if(memcmp(response, POWER_ON_ACK, sizeof(POWER_ON_ACK)) == 0) {
+            spdlog::debug("Power status is POWER_ON");
+            return 1;
+        }
+        if(memcmp(response, COOLING_ACK, sizeof(COOLING_ACK)) == 0) {
+            spdlog::debug("Power status is COOLING");
+            return 2;
+        }
+        if(memcmp(response, WARMING_ACK, sizeof(WARMING_ACK)) == 0) {
+            spdlog::debug("Power status is WARMING");
+            return 3;
+        }
+        if(memcmp(response, EMERGENCY_ACK, sizeof(EMERGENCY_ACK)) == 0) {
+            spdlog::debug("Power status is EMERGENCY");
+            return 4;
+        }
+        spdlog::warn("Unknown power status encountered");
+    }
+    return -1;
+}
+
+bool isOn() {
+    int status = queryPowerStatus();
+    return status == 1 || status == 3;
+}
+
+bool isOff() {
+    int status = queryPowerStatus();
+    return status == 0 || status == 2;
+}
 
 void setHost(const char * host) {
+    strcpy(HOST, host);
+}
+
+void setHost(char * host) {
     strcpy(HOST, host);
 }
 
@@ -168,6 +234,12 @@ int main(int argc, char *argv[]) {
         return -10;
     }
 
-    return sendNull();
+    // if (isOn()) {
+    //     sendOff();
+    // } else {
+    //     sendOn();
+    // }
+    queryPowerStatus();
+    return 0;
 }
 #endif
