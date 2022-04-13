@@ -148,7 +148,7 @@ int sendNull() {
 
 // TODO: query power status and return result
 
-void setHost(char * host) {
+void setHost(const char * host) {
     strcpy(HOST, host);
 }
 
