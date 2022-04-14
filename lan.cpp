@@ -129,6 +129,70 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
     return respLen;
 }
 
+struct timespec lastPowerQuery;
+int lastPowerQueryResult = -1;
+
+void queryPowerStatusCacheClear() {
+    lastPowerQueryResult = -1;
+}
+
+int queryPowerStatus() {
+    spdlog::info("Sending QUERY_POWER_COMMAND to host");
+    char unsigned response[MAX_RESPONSE_SIZE] { 0 };
+    const int cmdSize = sizeof(QUERY_POWER_COMMAND);
+    int ret = sendCommand(HOST, QUERY_POWER_COMMAND, cmdSize, response);
+    if(ret < 0) {
+        spdlog::error("Error communicating with host: {}", ret);
+    } else {
+        if(memcmp(response, STANDBY_ACK, sizeof(STANDBY_ACK)) == 0) {
+            spdlog::debug("Power status is STANDBY");
+            return 0;
+        }
+        if(memcmp(response, POWER_ON_ACK, sizeof(POWER_ON_ACK)) == 0) {
+            spdlog::debug("Power status is POWER_ON");
+            return 1;
+        }
+        if(memcmp(response, COOLING_ACK, sizeof(COOLING_ACK)) == 0) {
+            spdlog::debug("Power status is COOLING");
+            return 2;
+        }
+        if(memcmp(response, WARMING_ACK, sizeof(WARMING_ACK)) == 0) {
+            spdlog::debug("Power status is WARMING");
+            return 3;
+        }
+        if(memcmp(response, EMERGENCY_ACK, sizeof(EMERGENCY_ACK)) == 0) {
+            spdlog::debug("Power status is EMERGENCY");
+            return 4;
+        }
+        spdlog::warn("Unknown power status encountered");
+    }
+    return -1;
+}
+
+int queryPowerStatusCached() {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+
+    if(lastPowerQueryResult == -1) {
+        lastPowerQueryResult = queryPowerStatus();
+        lastPowerQuery.tv_sec = now.tv_sec;
+        lastPowerQuery.tv_nsec = now.tv_nsec;
+        return lastPowerQueryResult;
+    }
+
+    int ms_elapsed = (int)((lastPowerQuery.tv_sec - now.tv_sec) * 1000l
+                         + (lastPowerQuery.tv_nsec - now.tv_nsec) / 1000000l);
+
+    if(ms_elapsed >= POWER_QUERY_TTL_MS) {
+        lastPowerQueryResult = queryPowerStatus();
+        lastPowerQuery.tv_sec = now.tv_sec;
+        lastPowerQuery.tv_nsec = now.tv_nsec;
+    }
+
+    spdlog::debug("Returning cached power status: {}", lastPowerQueryResult);
+    return lastPowerQueryResult;
+}
+
 int sendOn() {
     spdlog::info("Sending ON_COMMAND to host");
     unsigned char response[MAX_RESPONSE_SIZE] { 0 };
@@ -165,70 +229,6 @@ int sendNull() {
         return ret;
     }
     return 0;
-}
-
-struct timespec lastPowerQuery;
-int lastPowerQueryResult = -1;
-
-int queryPowerStatusCacheClear() {
-    lastPowerQueryResult = -1;
-}
-
-int queryPowerStatusCached() {
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-
-    if(lastPowerQueryResult == -1) {
-        lastPowerQueryResult = queryPowerStatus();
-        lastPowerQuery.tv_sec = now.tv_sec;
-        lastPowerQuery.tv_nsec = now.tv_nsec;
-        return lastPowerQueryResult;
-    }
-
-    int ms_elapsed = (int)((lastPowerQuery.tv_sec - now.tv_sec) * 1000l
-                         + (lastPowerQuery.tv_nsec - now.tv_nsec) / 1000000l);
-
-    if(ms_elapsed >= POWER_QUERY_TTL_MS) {
-        lastPowerQueryResult = queryPowerStatus();
-        lastPowerQuery.tv_sec = now.tv_sec;
-        lastPowerQuery.tv_nsec = now.tv_nsec;
-    }
-
-    spdlog::debug("Returning cached power status: {}", lastPowerQueryResult);
-    return lastPowerQueryResult;
-}
-
-int queryPowerStatus() {
-    spdlog::info("Sending QUERY_POWER_COMMAND to host");
-    char unsigned response[MAX_RESPONSE_SIZE] { 0 };
-    const int cmdSize = sizeof(QUERY_POWER_COMMAND);
-    int ret = sendCommand(HOST, QUERY_POWER_COMMAND, cmdSize, response);
-    if(ret < 0) {
-        spdlog::error("Error communicating with host: {}", ret);
-    } else {
-        if(memcmp(response, STANDBY_ACK, sizeof(STANDBY_ACK)) == 0) {
-            spdlog::debug("Power status is STANDBY");
-            return 0;
-        }
-        if(memcmp(response, POWER_ON_ACK, sizeof(POWER_ON_ACK)) == 0) {
-            spdlog::debug("Power status is POWER_ON");
-            return 1;
-        }
-        if(memcmp(response, COOLING_ACK, sizeof(COOLING_ACK)) == 0) {
-            spdlog::debug("Power status is COOLING");
-            return 2;
-        }
-        if(memcmp(response, WARMING_ACK, sizeof(WARMING_ACK)) == 0) {
-            spdlog::debug("Power status is WARMING");
-            return 3;
-        }
-        if(memcmp(response, EMERGENCY_ACK, sizeof(EMERGENCY_ACK)) == 0) {
-            spdlog::debug("Power status is EMERGENCY");
-            return 4;
-        }
-        spdlog::warn("Unknown power status encountered");
-    }
-    return -1;
 }
 
 bool isOn() {
