@@ -3,7 +3,7 @@ OBJDIR := build
 all: $(OBJDIR)/cec-fix | $(OBJDIR)/
 
 $(OBJDIR)/cec-fix: $(OBJDIR)/lan.o $(OBJDIR)/main.o | $(OBJDIR)/
-	g++ -Wall -L/opt/vc/lib -L/usr/lib -lbcm_host -lvchiq_arm -lvcos -lm -lpigpio -lpthread $(OBJDIR)/lan.o $(OBJDIR)/main.o -o $(OBJDIR)/cec-fix
+	g++ -Wall -L/usr/lib $(OBJDIR)/lan.o $(OBJDIR)/main.o -lbcm_host -lvchiq_arm -lvcos -lpthread -o $(OBJDIR)/cec-fix
 
 $(OBJDIR)/main.o: main.cpp | $(OBJDIR)/
 	g++ -Wall -c -I. -Iinclude -I/usr/include -I/opt/vc/include main.cpp -o $(OBJDIR)/main.o
@@ -14,7 +14,7 @@ $(OBJDIR)/ir.o: ir.cpp | $(OBJDIR)/
 $(OBJDIR)/lan.o: lan.cpp | $(OBJDIR)/
 	g++ -Wall -c -I. -Iinclude -I/usr/include lan.cpp -o $(OBJDIR)/lan.o
 
-$(OBJDIR)/lan-test: $(OBJDIR)/lan.o | $(OBJDIR)/
+$(OBJDIR)/lan-test: lan-test.cpp $(OBJDIR)/lan.o | $(OBJDIR)/
 	g++ -Wall -I. -Iinclude lan-test.cpp $(OBJDIR)/lan.o -o $(OBJDIR)/lan-test
 
 $(OBJDIR)/:

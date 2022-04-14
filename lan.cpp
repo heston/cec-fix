@@ -115,7 +115,8 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
     }
 
     spdlog::debug(
-        "Received response from host: {:Xpn}",
+        "Received {} bytes from host: {:Xpn}",
+        respLen,
         spdlog::to_hex(std::begin(response_buffer), std::begin(response_buffer) + respLen)
     );
     memcpy(response, response_buffer.data(), respLen);
