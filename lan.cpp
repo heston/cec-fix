@@ -138,6 +138,7 @@ int sendOn() {
         spdlog::error("Error communicating with host: {}", ret);
         return ret;;
     }
+    queryPowerStatusCacheClear();
     return 0;
 }
 
@@ -150,6 +151,7 @@ int sendOff() {
         spdlog::error("Error communicating with host: {}", ret);
         return ret;
     }
+    queryPowerStatusCacheClear();
     return 0;
 }
 
@@ -167,6 +169,10 @@ int sendNull() {
 
 struct timespec lastPowerQuery;
 int lastPowerQueryResult = -1;
+
+int queryPowerStatusCacheClear() {
+    lastPowerQueryResult = -1;
+}
 
 int queryPowerStatusCached() {
     struct timespec now;
