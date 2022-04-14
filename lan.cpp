@@ -6,6 +6,7 @@
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/bin_to_hex.h"
 #include "socket_with_timeout.h"
+#include <time.h>
 #include <thread>         // this_thread::sleep_for
 #include <chrono>         // chrono::seconds
 #include "lan.hpp"
@@ -22,6 +23,8 @@ char HOST[15];
 const int SOCK_TIMEOUT_S = 5;
 const int SOCK_TIMEOUT_MS = SOCK_TIMEOUT_S * 1000;
 const int MAX_RESPONSE_SIZE = 4096;
+
+const int POWER_QUERY_TTL_MS = 10000;
 
 const unsigned char ON_COMMAND[] { 0x21, 0x89, 0x01, 0x50, 0x57, 0x31, 0x0A };
 const unsigned char OFF_COMMAND[] { 0x21, 0x89, 0x01, 0x50, 0x57, 0x30, 0x0A };
@@ -162,6 +165,33 @@ int sendNull() {
     return 0;
 }
 
+struct timespec lastPowerQuery;
+int lastPowerQueryResult = -1;
+
+int queryPowerStatusCached() {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+
+    if(lastPowerQueryResult == -1) {
+        lastPowerQueryResult = queryPowerStatus();
+        lastPowerQuery.tv_sec = now.tv_sec;
+        lastPowerQuery.tv_nsec = now.tv_nsec;
+        return lastPowerQueryResult;
+    }
+
+    int ms_elapsed = (int)((lastPowerQuery.tv_sec - now.tv_sec) * 1000l
+                         + (lastPowerQuery.tv_nsec - now.tv_nsec) / 1000000l);
+
+    if(ms_elapsed >= POWER_QUERY_TTL_MS) {
+        lastPowerQueryResult = queryPowerStatus();
+        lastPowerQuery.tv_sec = now.tv_sec;
+        lastPowerQuery.tv_nsec = now.tv_nsec;
+    }
+
+    spdlog::debug("Returning cached power status: {}", lastPowerQueryResult);
+    return lastPowerQueryResult;
+}
+
 int queryPowerStatus() {
     spdlog::info("Sending QUERY_POWER_COMMAND to host");
     char unsigned response[MAX_RESPONSE_SIZE] { 0 };
@@ -196,12 +226,12 @@ int queryPowerStatus() {
 }
 
 bool isOn() {
-    int status = queryPowerStatus();
+    int status = queryPowerStatusCached();
     return status == 1 || status == 3;
 }
 
 bool isOff() {
-    int status = queryPowerStatus();
+    int status = queryPowerStatusCached();
     return status == 0 || status == 2;
 }
 
