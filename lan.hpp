@@ -1,7 +1,7 @@
 #ifndef LAN_H
 #define LAN_H
 
-static const char DEFAULT_HOST[] { "192.168.86.90" };
+static const char DEFAULT_HOST[] { "192.168.86.100" };
 
 /**
  * Set the global projector host.
