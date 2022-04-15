@@ -355,9 +355,11 @@ bool initLAN(int argc, char *argv[]) {
 	if (argc == 1) {
 		// No host provided, use default
 		setHost(DEFAULT_HOST);
+		spdlog::info("Projector host is {}", DEFAULT_HOST);
 	} else if (argc == 2) {
 		// Host provided
 		setHost(argv[1]);
+		spdlog::info("Projector host is {}", argv[1]);
 	} else {
 		spdlog::critical("Invalid invocation. First arg must be ip address of host, or omitted to use default.");
 		return false;
