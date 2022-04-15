@@ -11,7 +11,7 @@ $(OBJDIR)/main.o: main.cpp | $(OBJDIR)/
 $(OBJDIR)/ir.o: ir.cpp | $(OBJDIR)/
 	g++ -Wall -c -Iinclude -I/usr/include ir.cpp -o $(OBJDIR)/ir.o
 
-$(OBJDIR)/lan.o: lan.cpp | $(OBJDIR)/
+$(OBJDIR)/lan.o: lan.hpp lan.cpp | $(OBJDIR)/
 	g++ -Wall -c -I. -Iinclude -I/usr/include lan.cpp -o $(OBJDIR)/lan.o
 
 $(OBJDIR)/lan-test: lan-test.cpp $(OBJDIR)/lan.o | $(OBJDIR)/
