@@ -5,11 +5,8 @@ all: $(OBJDIR)/cec-fix | $(OBJDIR)/
 $(OBJDIR)/cec-fix: $(OBJDIR)/lan.o $(OBJDIR)/main.o | $(OBJDIR)/
 	g++ -Wall -L/usr/lib $(OBJDIR)/lan.o $(OBJDIR)/main.o -lbcm_host -lvchiq_arm -lvcos -lpthread -o $(OBJDIR)/cec-fix
 
-$(OBJDIR)/main.o: main.cpp | $(OBJDIR)/
+$(OBJDIR)/main.o: lan.hpp main.cpp | $(OBJDIR)/
 	g++ -Wall -c -I. -Iinclude -I/usr/include -I/opt/vc/include main.cpp -o $(OBJDIR)/main.o
-
-$(OBJDIR)/ir.o: ir.cpp | $(OBJDIR)/
-	g++ -Wall -c -Iinclude -I/usr/include ir.cpp -o $(OBJDIR)/ir.o
 
 $(OBJDIR)/lan.o: lan.hpp lan.cpp | $(OBJDIR)/
 	g++ -Wall -c -I. -Iinclude -I/usr/include lan.cpp -o $(OBJDIR)/lan.o
