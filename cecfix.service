@@ -1,9 +1,11 @@
 [Unit]
 Description=CEC Fix
-After=multi-user.target
+After=syslog.target network.target multi-user.target
 
 [Service]
-Type=idle
+Type=simple
+User=pi
+Group=pi
 ExecStart={{DIR}}/build/cec-fix
 Restart=always
 RestartSec=5

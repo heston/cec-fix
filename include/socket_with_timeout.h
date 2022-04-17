@@ -49,6 +49,7 @@ int connect_with_timeout(int sockfd, const struct sockaddr *addr, socklen_t addr
                     if(rc > 0) {
                         int error = 0; socklen_t len = sizeof(error);
                         int retval = getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, &len);
+                        spdlog::debug("SO_ERROR on sockfd {}: {}", sockfd, error);
                         if(retval == 0)
                             errno = error;
                         if(error != 0)
