@@ -3,6 +3,8 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <time.h>
+#include "spdlog/spdlog.h"
+
 
 int connect_with_timeout(int sockfd, const struct sockaddr *addr, socklen_t addrlen, unsigned int timeout_ms) {
     int rc = 0;
@@ -45,6 +47,7 @@ int connect_with_timeout(int sockfd, const struct sockaddr *addr, socklen_t addr
                     // Wait for connect to complete (or for the timeout deadline)
                     struct pollfd pfds[] = { { .fd = sockfd, .events = POLLOUT } };
                     rc = poll(pfds, 1, ms_until_deadline);
+                    spdlog::debug("poll return: {}", rc);
                     // If poll 'succeeded', make sure it *really* succeeded
                     if(rc > 0) {
                         int error = 0; socklen_t len = sizeof(error);
