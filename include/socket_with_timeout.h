@@ -10,40 +10,41 @@ int connect_with_timeout(int sockfd, const struct sockaddr *addr, socklen_t addr
     int rc = 0;
     // Set O_NONBLOCK
     int sockfd_flags_before;
-    if((sockfd_flags_before=fcntl(sockfd,F_GETFL,0) < 0))
-        return -1;
-    if(fcntl(sockfd,F_SETFL,sockfd_flags_before | O_NONBLOCK) < 0)
-        return -1;
+    if((sockfd_flags_before = fcntl(sockfd, F_GETFL, 0) < 0))
+        return -9;
+    if(fcntl(sockfd, F_SETFL, sockfd_flags_before | O_NONBLOCK) < 0)
+        return -9;
+
     // Start connecting (asynchronously)
     do {
         if (connect(sockfd, addr, addrlen) < 0) {
             // Did connect return an error? If so, we'll fail.
             if ((errno != EWOULDBLOCK) && (errno != EINPROGRESS)) {
-                rc = -2;
-            }
-            // Otherwise, we'll wait for it to complete.
-            else {
+                rc = -1;
+            } else {  // Otherwise, we'll wait for it to complete.
                 // Set a deadline timestamp 'timeout' ms from now (needed b/c poll can be interrupted)
                 struct timespec now;
                 if(clock_gettime(CLOCK_MONOTONIC, &now) < 0) {
-                    rc = -3;
+                    rc = -1;
                     break;
                 }
+
                 struct timespec deadline = { .tv_sec = now.tv_sec,
                                              .tv_nsec = now.tv_nsec + timeout_ms * 1000000l};
                 // Wait for the connection to complete.
                 do {
                     // Calculate how long until the deadline
                     if(clock_gettime(CLOCK_MONOTONIC, &now) < 0) {
-                        rc = -4;
+                        rc = -1;
                         break;
                     }
                     int ms_until_deadline = (int)(  (deadline.tv_sec  - now.tv_sec) * 1000l
                                                   + (deadline.tv_nsec - now.tv_nsec) / 1000000l);
                     if(ms_until_deadline < 0) {
-                        rc = -5;
+                        rc = 0;
                         break;
                     }
+
                     // Wait for connect to complete (or for the timeout deadline)
                     struct pollfd pfds[] = { { .fd = sockfd, .events = POLLOUT } };
                     rc = poll(pfds, 1, ms_until_deadline);
@@ -56,22 +57,21 @@ int connect_with_timeout(int sockfd, const struct sockaddr *addr, socklen_t addr
                         if(retval == 0)
                             errno = error;
                         if(error != 0)
-                            rc = -6;
+                            rc = -1;
                     }
-                }
-                // If poll was interrupted, try again.
-                while(rc < 0 && errno == EINTR);
+                } while(rc == -1 && errno == EINTR);  // If poll was interrupted, try again.
                 // Did poll timeout? If so, fail.
-                if(rc == -6) {
+                if(rc == 0) {
                     errno = ETIMEDOUT;
-                    rc = -7;
+                    rc = -1;
                 }
             }
         }
     } while(0);
     // Restore original O_NONBLOCK state
-    if(fcntl(sockfd,F_SETFL,sockfd_flags_before) < 0)
-        return -8;
+    if(fcntl(sockfd, F_SETFL, sockfd_flags_before) < 0)
+        return -1;
+
     // Success
     return rc;
 }

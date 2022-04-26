@@ -85,6 +85,7 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
         return -3;
     }
 
+    // 1: Projector should send PJ_OK
     if(read(sock, buffer, 4096) == -1) {
         spdlog::error("Socket read error");
         return -4;
@@ -97,8 +98,11 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
 
     // Clear buffer
     memset(buffer, 0, sizeof(buffer));
+
+    // 2: Reply with PJREQ
     send(sock, REQUEST, strlen(REQUEST), 0);
 
+    // 3: Projector should send PJACK
     if(read(sock, buffer, 4096) == -1) {
         spdlog::error("Socket read error");
         return -4;
@@ -109,8 +113,13 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
         return -5;
     }
 
+    // 4: Send user command to projector
     send(sock, code, codeLen, 0);
 
+    // Clear buffer
+    memset(buffer, 0, sizeof(buffer));
+
+    // Return response to caller
     ssize_t respLen = read(sock, static_cast<void *>(&response_buffer), 4096);
     if( respLen == -1) {
         spdlog::error("Socket read error");
