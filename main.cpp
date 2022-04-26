@@ -66,8 +66,8 @@ bool isImageViewOn(VC_CEC_MESSAGE_T &message) {
  */
 bool isTVOffCmd(VC_CEC_MESSAGE_T &message) {
 	return (
-		(message.follower == CEC_DeviceType_TV || message.follower == CEC_BROADCAST_ADDR) &&
-		message.initiator != CEC_DeviceType_TV &&
+		(message.follower == CEC_AllDevices_eTV || message.follower == CEC_BROADCAST_ADDR) &&
+		message.initiator != CEC_AllDevices_eTV &&
 		message.length == 1 &&
 		message.payload[0] == CEC_Opcode_Standby
 	);
