@@ -371,6 +371,7 @@ bool initLAN(int argc, char *argv[]) {
 		return false;
 	}
 
+	spdlog::debug("LAN init successful");
 	return true;
 }
 
@@ -388,7 +389,7 @@ int main(int argc, char *argv[]) {
 	spdlog::set_level(spdlog::level::debug); // Set global log level to debug
 
 	if (!initLAN(argc, argv)) {
-		return 2;
+		return 1;
 	}
 
 	if (!initCEC()) {
