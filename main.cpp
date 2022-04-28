@@ -66,7 +66,8 @@ bool isImageViewOn(VC_CEC_MESSAGE_T &message) {
  */
 bool isTVOffCmd(VC_CEC_MESSAGE_T &message) {
 	return (
-		message.follower == 0 &&
+		(message.follower == CEC_AllDevices_eTV || message.follower == CEC_BROADCAST_ADDR) &&
+		message.initiator != CEC_AllDevices_eTV &&
 		message.length == 1 &&
 		message.payload[0] == CEC_Opcode_Standby
 	);
@@ -364,6 +365,13 @@ bool initLAN(int argc, char *argv[]) {
 		spdlog::critical("Invalid invocation. First arg must be ip address of host, or omitted to use default.");
 		return false;
 	}
+
+	if(sendNull() < 0) {
+		spdlog::critical("Could not communicate with projector host.");
+		return false;
+	}
+
+	spdlog::debug("LAN init successful");
 	return true;
 }
 
@@ -381,7 +389,7 @@ int main(int argc, char *argv[]) {
 	spdlog::set_level(spdlog::level::debug); // Set global log level to debug
 
 	if (!initLAN(argc, argv)) {
-		return 2;
+		return 1;
 	}
 
 	if (!initCEC()) {
