@@ -47,95 +47,109 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
     char buffer[MAX_RESPONSE_SIZE] { 0 };
     std::array<unsigned char, MAX_RESPONSE_SIZE> response_buffer;
 
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        spdlog::error("Socket creation error");
-        return -1;
-    }
+    int retCode { 0 };
 
-    const void* timeout = &SOCK_TIMEOUT_S;
-    socklen_t len = sizeof(int);
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, timeout, len);
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, timeout, len);
-
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
-
-    // Convert IPv4 and IPv6 addresses from text to binary form
-    if (inet_pton(AF_INET, host, &serv_addr.sin_addr) < 1) {
-        spdlog::error("Invalid host address: {}", host);
-        return -2;
-    }
-
-    int connectRet = connect_with_timeout(
-        sock,
-        (struct sockaddr*)&serv_addr,
-        sizeof(serv_addr),
-        SOCK_TIMEOUT_MS
-    );
-
-    spdlog::debug("connect_with_timeout return code: {}", connectRet);
-
-    if(connectRet < 1) {
-        if (connectRet == -7) {
-            spdlog::error("Connection to host {} timed out after {}ms", host, SOCK_TIMEOUT_MS);
-        } else {
-            spdlog::error("Connection to host {} could not be established. Error code {}", host, connectRet);
+    do {
+        if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+            spdlog::error("Socket creation error");
+            retCode = -1;
+            break;
         }
 
-        return -3;
-    }
+        const void* timeout = &SOCK_TIMEOUT_S;
+        socklen_t len = sizeof(int);
+        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, timeout, len);
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, timeout, len);
 
-    // 1: Projector should send PJ_OK
-    if(read(sock, buffer, 4096) == -1) {
-        spdlog::error("Socket read error");
-        return -4;
-    };
+        serv_addr.sin_family = AF_INET;
+        serv_addr.sin_port = htons(PORT);
 
-    if (strcmp(OPEN, buffer) != 0) {
-        spdlog::error("Unexpected greeting: {}", buffer);
-        return -5;
-    }
+        // Convert IPv4 and IPv6 addresses from text to binary form
+        if (inet_pton(AF_INET, host, &serv_addr.sin_addr) < 1) {
+            spdlog::error("Invalid host address: {}", host);
+            retCode = -2;
+            break;
+        }
 
-    // Clear buffer
-    memset(buffer, 0, sizeof(buffer));
+        int connectRet = connect_with_timeout(
+            sock,
+            (struct sockaddr*)&serv_addr,
+            sizeof(serv_addr),
+            SOCK_TIMEOUT_MS
+        );
 
-    // 2: Reply with PJREQ
-    send(sock, REQUEST, strlen(REQUEST), 0);
+        spdlog::debug("connect_with_timeout return code: {}", connectRet);
 
-    // 3: Projector should send PJACK
-    if(read(sock, buffer, 4096) == -1) {
-        spdlog::error("Socket read error");
-        return -4;
-    }
+        if(connectRet < 1) {
+            if (connectRet == -7) {
+                spdlog::error("Connection to host {} timed out after {}ms", host, SOCK_TIMEOUT_MS);
+            } else {
+                spdlog::error("Connection to host {} could not be established. Error code {}", host, connectRet);
+            }
 
-    if (strcmp(ACK, buffer) != 0) {
-        spdlog::error("Unexpected ACK: {}", buffer);
-        return -5;
-    }
+            retCode = -3;
+            break;
+        }
 
-    // 4: Send user command to projector
-    send(sock, code, codeLen, 0);
+        // 1: Projector should send PJ_OK
+        if(read(sock, buffer, 4096) == -1) {
+            spdlog::error("Socket read error");
+            retCode = -4;
+            break;
+        };
 
-    // Clear buffer
-    memset(buffer, 0, sizeof(buffer));
+        if (strcmp(OPEN, buffer) != 0) {
+            spdlog::error("Unexpected greeting: {}", buffer);
+            retCode = -5;
+            break;
+        }
 
-    // Return response to caller
-    ssize_t respLen = read(sock, static_cast<void *>(&response_buffer), 4096);
-    if( respLen == -1) {
-        spdlog::error("Socket read error");
-        return -4;
-    }
+        // Clear buffer
+        memset(buffer, 0, sizeof(buffer));
 
-    spdlog::debug(
-        "Received {} bytes from host: {:Xpn}",
-        respLen,
-        spdlog::to_hex(std::begin(response_buffer), std::begin(response_buffer) + respLen)
-    );
-    memcpy(response, response_buffer.data(), respLen);
+        // 2: Reply with PJREQ
+        send(sock, REQUEST, strlen(REQUEST), 0);
+
+        // 3: Projector should send PJACK
+        if(read(sock, buffer, 4096) == -1) {
+            spdlog::error("Socket read error");
+            retCode = -4;
+            break;
+        }
+
+        if (strcmp(ACK, buffer) != 0) {
+            spdlog::error("Unexpected ACK: {}", buffer);
+            retCode = -5;
+            break;
+        }
+
+        // 4: Send user command to projector
+        send(sock, code, codeLen, 0);
+
+        // Clear buffer
+        memset(buffer, 0, sizeof(buffer));
+
+        // Return response to caller
+        ssize_t respLen = read(sock, static_cast<void *>(&response_buffer), 4096);
+        if( respLen == -1) {
+            spdlog::error("Socket read error");
+            retCode = -4;
+            break;
+        }
+
+        spdlog::debug(
+            "Received {} bytes from host: {:Xpn}",
+            respLen,
+            spdlog::to_hex(std::begin(response_buffer), std::begin(response_buffer) + respLen)
+        );
+        memcpy(response, response_buffer.data(), respLen);
+        retCode = respLen;
+    } while (0);
+
     close(sock);
     // Wait for host to close other end
     this_thread::sleep_for(chrono::seconds(1));
-    return respLen;
+    return retCode;
 }
 
 struct timespec lastPowerQuery;
