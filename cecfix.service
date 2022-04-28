@@ -1,6 +1,6 @@
 [Unit]
 Description=CEC Fix
-After=syslog.target network.target multi-user.target
+After=network.target multi-user.target
 
 [Service]
 Type=simple
