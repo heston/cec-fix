@@ -53,7 +53,9 @@ void turnOnTV() {
  */
 bool isImageViewOn(VC_CEC_MESSAGE_T &message) {
 	return (message.length == 1 &&
-		    message.payload[0] == CEC_Opcode_ImageViewOn
+		    (message.payload[0] == CEC_Opcode_ImageViewOn ||
+			 message.payload[0] == CEC_Opcode_TextViewOn
+			)
 	);
 }
 
