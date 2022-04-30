@@ -203,8 +203,8 @@ int queryPowerStatusCached() {
         return lastPowerQueryResult;
     }
 
-    int ms_elapsed = (int)((lastPowerQuery.tv_sec - now.tv_sec) * 1000l
-                         + (lastPowerQuery.tv_nsec - now.tv_nsec) / 1000000l);
+    int ms_elapsed = (int)((now.tv_sec - lastPowerQuery.tv_sec) * 1000l
+                         + (now.tv_nsec - lastPowerQuery.tv_nsec) / 1000000l);
 
     if(ms_elapsed >= POWER_QUERY_TTL_MS) {
         lastPowerQueryResult = queryPowerStatus();
