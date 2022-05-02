@@ -23,6 +23,7 @@ char HOST[15];
 const int SOCK_TIMEOUT_S = 5;
 const int SOCK_TIMEOUT_MS = SOCK_TIMEOUT_S * 1000;
 const int MAX_RESPONSE_SIZE = 4096;
+const int MAX_RETRY_COUNT = 3;
 
 const int POWER_QUERY_TTL_MS = 10000;
 
@@ -152,6 +153,18 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
     return retCode;
 }
 
+int sendCommandWithRetry(const char* host, const unsigned char* code, int codeLen, unsigned char* response) {
+    int retCode { -1 };
+    int retry { 0 };
+    while (retCode < 0 && retry < MAX_RETRY_COUNT) {
+        spdlog::info("sendCommandWithRetry attempt {} of {}", retry + 1, MAX_RETRY_COUNT);
+        retCode = sendCommand(host, code, codeLen, response);
+        retry++;
+    }
+
+    return retCode;
+}
+
 struct timespec lastPowerQuery;
 int lastPowerQueryResult = -1;
 
@@ -163,7 +176,7 @@ int queryPowerStatus() {
     spdlog::info("Sending QUERY_POWER_COMMAND to host");
     char unsigned response[MAX_RESPONSE_SIZE] { 0 };
     const int cmdSize = sizeof(QUERY_POWER_COMMAND);
-    int ret = sendCommand(HOST, QUERY_POWER_COMMAND, cmdSize, response);
+    int ret = sendCommandWithRetry(HOST, QUERY_POWER_COMMAND, cmdSize, response);
     if(ret < 0) {
         spdlog::error("Error communicating with host: {}", ret);
     } else {
@@ -220,7 +233,7 @@ int sendOn() {
     spdlog::info("Sending ON_COMMAND to host");
     unsigned char response[MAX_RESPONSE_SIZE] { 0 };
     const int cmdSize = sizeof(ON_COMMAND);
-    int ret = sendCommand(HOST, ON_COMMAND, cmdSize, response);
+    int ret = sendCommandWithRetry(HOST, ON_COMMAND, cmdSize, response);
     if(ret < 0) {
         spdlog::error("Error communicating with host: {}", ret);
         return ret;;
@@ -233,7 +246,7 @@ int sendOff() {
     spdlog::info("Sending OFF_COMMAND to host");
     unsigned char response[MAX_RESPONSE_SIZE] { 0 };
     const int cmdSize = sizeof(OFF_COMMAND);
-    int ret = sendCommand(HOST, OFF_COMMAND, cmdSize, response);
+    int ret = sendCommandWithRetry(HOST, OFF_COMMAND, cmdSize, response);
     if(ret < 0) {
         spdlog::error("Error communicating with host: {}", ret);
         return ret;
@@ -246,7 +259,7 @@ int sendNull() {
     spdlog::info("Sending NULL_COMMAND to host");
     unsigned char response[MAX_RESPONSE_SIZE] { 0 };
     const int cmdSize = sizeof(NULL_COMMAND);
-    int ret = sendCommand(HOST, NULL_COMMAND, cmdSize, response);
+    int ret = sendCommandWithRetry(HOST, NULL_COMMAND, cmdSize, response);
     if(ret < 0) {
         spdlog::error("Error communicating with host: {}", ret);
         return ret;
