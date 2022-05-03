@@ -157,7 +157,7 @@ int sendCommandWithRetry(const char* host, const unsigned char* code, int codeLe
     int retCode { -1 };
     int retry { 0 };
     while (retCode < 0 && retry < MAX_RETRY_COUNT) {
-        spdlog::info("sendCommandWithRetry attempt {} of {}", retry + 1, MAX_RETRY_COUNT);
+        spdlog::debug("sendCommandWithRetry attempt {} of {}", retry + 1, MAX_RETRY_COUNT);
         retCode = sendCommand(host, code, codeLen, response);
         retry++;
     }
