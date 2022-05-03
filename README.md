@@ -45,7 +45,8 @@ Installation
 1. `/build/cec-fix` to run. `CTRL-c` to exit.
 1. To run as a service on boot: `sudo make install`.
 
-_A note on GPU driver compatibility_
+**_A note on GPU driver compatibility_**
+
 The default GPU driver was replaced with DRM V4 V3D on newer distributions of Raspian (at least starting at Bullseye). This appears to be incompatible with the Broadcom CEC APIs used by this project. If you run into trouble, you can disable these newer drivers:
 
 1. Open `/boot/config.txt` for editing (e.g. `sudo vim /boot/config.txt`).
