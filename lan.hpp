@@ -63,4 +63,15 @@ bool isOff();
  */
 int queryPowerStatus();
 
+/**
+ * Same as queryPowerStatus but caches the result for 10 seconds.
+ *
+ * This prevents many rapid calls for the power status from overloading
+ * the projector's maximum connection count (which appears quite low,
+ * empirically).
+ *
+ * @return  int     @see queryPowerStatus
+ */
+int queryPowerStatusCached();
+
 #endif
