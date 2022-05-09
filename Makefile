@@ -14,6 +14,12 @@ $(OBJDIR)/lan.o: lan.hpp lan.cpp | $(OBJDIR)/
 $(OBJDIR)/lan-test: lan-test.cpp $(OBJDIR)/lan.o | $(OBJDIR)/
 	g++ -Wall -I. -Iinclude lan-test.cpp $(OBJDIR)/lan.o -o $(OBJDIR)/lan-test
 
+$(OBJDIR)/fifo.o: fifo.hpp fifo.cpp | $(OBJDIR)/
+	g++ -Wall -c -I. -Iinclude -I/usr/include fifo.cpp -o $(OBJDIR)/fifo.o
+
+$(OBJDIR)/fifo-test: fifo-test.cpp $(OBJDIR)/fifo.o | $(OBJDIR)/
+	g++ -Wall -I. -Iinclude fifo-test.cpp $(OBJDIR)/fifo.o -o $(OBJDIR)/fifo-test
+
 $(OBJDIR)/:
 	mkdir -p $@
 
