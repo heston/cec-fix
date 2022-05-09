@@ -13,27 +13,47 @@ using namespace std;
 
 bool want_run = true;
 
+// Mapping of logical to physical addresses
 unordered_map<CEC_AllDevices_T, uint8_t*> addressMap { 0 };
 
 /**
- * Set the entire system to standby.
+ * Return string representation of a message payload.
+ *
+ * @param unit8_t * payload The message payload as an array of bytes.
+ * @param size_t length The length of the message.
+ *
+ * @return  string
  */
-int systemStandby() {
-	spdlog::debug("systemStandby called");
-	// turnOffTV();
-	broadcastStandby();
-	return 1;
+string getOpcodeString(uint8_t* payload, size_t length) {
+	string content = "";
+	for (size_t i = 0; i < length; i++)
+	{
+		content += fmt::format("{:X} ", payload[i]);
+	}
+	return content;
 }
 
-int systemActive() {
-	spdlog::debug("systemActive called");
-	// turnOnTV();
-	setStreamPathToPlayback1();
-	return 1;
+/**
+ * Request the physical address of a logical address.
+ *
+ * @param CEC_AllDevices follower Logical address of the device.
+ */
+void getPhysicalAddress(CEC_AllDevices follower) {
+	spdlog::info("Get physical address for {}", follower);
+	uint8_t bytes[1];
+	bytes[0] = CEC_Opcode_GivePhysicalAddress;
+	if (vc_cec_send_message(follower,
+			bytes, 1, VC_FALSE) != 0) {
+		spdlog::error( "Failed to request physical address.");
+	}
 }
 
+// Marker to remember if we are waiting on a physical address to set the stream path.
 bool want_set_stream_path = false;
 
+/**
+ * Set the stream path to Playback1 device.
+ */
 void setStreamPathToPlayback1() {
 	uint8_t * address;
 	try {
@@ -46,29 +66,20 @@ void setStreamPathToPlayback1() {
 	setStreamPath(address);
 }
 
-string getOpcodeString(uint8_t* payload, size_t length) {
-	string content = "";
-	for (size_t i = 0; i < length; i++)
-	{
-		content += fmt::format("{:X} ", payload[i]);
-	}
-	return content;
-}
-
-void getPhysicalAddress(CEC_AllDevices follower) {
-	spdlog::info("Get physical address for {}", follower);
-	uint8_t bytes[1];
-	bytes[0] = CEC_Opcode_GivePhysicalAddress;
-	if (vc_cec_send_message(follower,
-			bytes, 1, VC_FALSE) != 0) {
-		spdlog::error( "Failed to request physical address.");
-	}
-}
-
+/**
+ * Whether a CEC message is a device reporting physical address.
+ *
+ * @return  bool
+ */
 bool isReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
 	return message.payload[0] == CEC_Opcode_ReportPhysicalAddress;
 }
 
+/**
+ * Handler for a CEC message that reports a device's physical address.
+ *
+ * @param VC_CEC_MESSAGE_T message The message to parse.
+ */
 void handleReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
 	string content = getOpcodeString(message.payload, message.length);
 	spdlog::debug("handleReportPhysicalAddress: {}:{}", message.initiator, content);
@@ -80,7 +91,12 @@ void handleReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
 	}
 }
 
-int setStreamPath(uint8_t * physicalAddress) {
+/**
+ * Set the stream path to a physical address.
+ *
+ * @param uint8_t * physicalAddress Array of bytes representing a device's physical address.
+ */
+void setStreamPath(uint8_t * physicalAddress) {
 	string path = getOpcodeString(physicalAddress, 2);
 	spdlog::info("Set stream path to: {}", path);
 	uint8_t bytes[3];
@@ -231,6 +247,26 @@ void replyWithPowerStatus(int requestor) {
 			bytes, 2, VC_TRUE) != 0) {
 		spdlog::error("Failed to reply with TV power status.");
 	}
+}
+
+/**
+ * Set the entire system to standby.
+ */
+int systemStandby() {
+	spdlog::debug("systemStandby called");
+	// turnOffTV();
+	broadcastStandby();
+	return 1;
+}
+
+/**
+ * Turns on the entire system and set active source to Playback 1.
+ */
+int systemActive() {
+	spdlog::debug("systemActive called");
+	// turnOnTV();
+	setStreamPathToPlayback1();
+	return 1;
 }
 
 /**
