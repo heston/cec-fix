@@ -5,7 +5,7 @@
 #include "spdlog/spdlog.h"
 #include <string.h>
 #include <signal.h>
-#include <map>
+#include <unordered_map>
 #include "lan.hpp"
 #include "fifo.hpp"
 
@@ -13,7 +13,7 @@ using namespace std;
 
 bool want_run = true;
 
-map<CEC_AllDevices_T, uint8_t*> addressMap;
+unordered_map<CEC_AllDevices_T, uint8_t*> addressMap { 0 };
 
 /**
  * Set the entire system to standby.
@@ -21,15 +21,29 @@ map<CEC_AllDevices_T, uint8_t*> addressMap;
 int systemStandby() {
 	spdlog::debug("systemStandby called");
 	// turnOffTV();
-	// broadcastStandby();
+	broadcastStandby();
 	return 1;
 }
 
 int systemActive() {
 	spdlog::debug("systemActive called");
 	// turnOnTV();
-	// TODO: setStreamPath to physical address of Playback1.
+	setStreamPathToPlayback1();
 	return 1;
+}
+
+bool want_set_stream_path = false;
+
+void setStreamPathToPlayback1() {
+	uint8_t * address;
+	try {
+		address = addressMap.at(CEC_AllDevices_eDVD1);
+	} catch(const out_of_range &e) {
+		want_set_stream_path = true;
+		getPhysicalAddress(CEC_AllDevices_eDVD1);
+		return;
+	}
+	setStreamPath(address);
 }
 
 string getOpcodeString(uint8_t* payload, size_t length) {
@@ -56,13 +70,17 @@ bool isReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
 }
 
 void handleReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
-	pair<CEC_AllDevices_T, uint8_t*> address = make_pair(message.initiator, message.payload);
 	string content = getOpcodeString(message.payload, message.length);
 	spdlog::debug("handleReportPhysicalAddress: {}:{}", message.initiator, content);
-	addressMap.insert(address);
+	addressMap[message.initiator] = message.payload;
+
+	if (want_set_stream_path) {
+		setStreamPath(message.payload);
+		want_set_stream_path = false;
+	}
 }
 
-int setStreamPath(uint8_t physicalAddress[2]) {
+int setStreamPath(uint8_t * physicalAddress) {
 	string path = getOpcodeString(physicalAddress, 2);
 	spdlog::info("Set stream path to: {}", path);
 	uint8_t bytes[3];
@@ -307,6 +325,12 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 	if (isRequestForPowerStatus(message)) {
 		spdlog::info("Power status request message received.");
 		replyWithPowerStatus(message.initiator);
+		return;
+	}
+
+	if(isReportPhysicalAddress(message)) {
+		spdlog::info("Rerport physical address message received.");
+		handleReportPhysicalAddress(message);
 		return;
 	}
 }
