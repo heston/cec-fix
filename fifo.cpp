@@ -92,7 +92,7 @@ int initFIFO(f_callback off_callback, f_callback on_callback) {
         return -1;
     };
 
-    fifo_fd = open(PIPE_PATH, O_RDONLY | O_ASYNC | O_NONBLOCK);
+    fifo_fd = open(PIPE_PATH, O_RDONLY | O_NONBLOCK);
 
     if (fifo_fd < 1) {
         spdlog::error("File descriptor for {} could not be obtained: {}.", PIPE_PATH, strerror(errno));
@@ -102,6 +102,7 @@ int initFIFO(f_callback off_callback, f_callback on_callback) {
     spdlog::debug("fd open at {}", fifo_fd);
 
     fcntl(fifo_fd, F_SETOWN, getpid()); // set PID of the receiving process
+    fcntl(fifo_fd, F_SETFL, fcntl(fifo_fd, F_GETFL) | O_ASYNC); // enable asynchronous beahviour
     fcntl(fifo_fd, F_SETSIG, SIGIO); // set the signal that is sent when the kernel tell us that there is a read/write on the fifo.
 
     return 1;
