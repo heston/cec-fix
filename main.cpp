@@ -5,11 +5,75 @@
 #include "spdlog/spdlog.h"
 #include <string.h>
 #include <signal.h>
+#include <map>
 #include "lan.hpp"
+#include "fifo.hpp"
 
 using namespace std;
 
 bool want_run = true;
+
+map<CEC_AllDevices_T, uint8_t*> addressMap;
+
+/**
+ * Set the entire system to standby.
+ */
+int systemStandby() {
+	spdlog::debug("systemStandby called");
+	// turnOffTV();
+	// broadcastStandby();
+	return 1;
+}
+
+int systemActive() {
+	spdlog::debug("systemActive called");
+	// turnOnTV();
+	// TODO: setStreamPath to physical address of Playback1.
+	return 1;
+}
+
+string getOpcodeString(uint8_t* payload, int length) {
+	string content = "";
+	for (size_t i = 0; i < length; i++)
+	{
+		content += fmt::format("{:X} ", payload[i]);
+	}
+	return content;
+}
+
+void getPhysicalAddress(CEC_AllDevices follower) {
+	spdlog::info("Get physical address for {}", follower);
+	uint8_t bytes[1];
+	bytes[0] = CEC_Opcode_GivePhysicalAddress;
+	if (vc_cec_send_message(follower,
+			bytes, 1, VC_FALSE) != 0) {
+		spdlog::error( "Failed to request physical address.");
+	}
+}
+
+bool isReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
+	return message.payload[0] == CEC_Opcode_ReportPhysicalAddress;
+}
+
+void handleReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
+	pair<CEC_AllDevices_T, uint8_t*> address = make_pair(message.initiator, message.payload);
+	string content = getOpcodeString(message.payload, message.length);
+	spdlog::debug("handleReportPhysicalAddress: {}:{}", message.initiator, content);
+	addressMap.insert(address);
+}
+
+int setStreamPath(uint8_t physicalAddress[2]) {
+	string path = getOpcodeString(physicalAddress, 2);
+	spdlog::info("Set stream path to: {}", path);
+	uint8_t bytes[3];
+	bytes[0] = CEC_Opcode_SetStreamPath;
+	bytes[1] = physicalAddress[0];
+	bytes[2] = physicalAddress[1];
+	if (vc_cec_send_message(CEC_BROADCAST_ADDR,
+			bytes, 3, VC_FALSE) != 0) {
+		spdlog::error( "Failed to set stream path.");
+	}
+}
 
 /**
  * Turn off the TV by sending the correct IR sequence.
@@ -83,10 +147,8 @@ bool isTVOffCmd(VC_CEC_MESSAGE_T &message) {
  */
 void broadcastStandby() {
 	spdlog::info("Broadcasting standby");
-	uint8_t bytes[1];
-	bytes[0] = CEC_Opcode_Standby;
-	if (vc_cec_send_message(CEC_BROADCAST_ADDR,
-			bytes, 1, VC_FALSE) != 0) {
+
+	if (vc_cec_send_Standby(CEC_BROADCAST_ADDR, false) != 0) {
 		spdlog::error( "Failed to broadcast standby command.");
 	}
 }
@@ -114,13 +176,7 @@ bool isRequestForVendorId(VC_CEC_MESSAGE_T &message) {
  */
 void broadcastVendorId() {
 	spdlog::info("Broadcasting Vendor ID {}", CEC_VENDOR_ID_BROADCOM);
-	uint8_t bytes[4];
-	bytes[0] = CEC_Opcode_DeviceVendorID;
-	bytes[1] = (CEC_VENDOR_ID_BROADCOM >> 16) & 0xFF;
-	bytes[2] = (CEC_VENDOR_ID_BROADCOM >> 8) & 0xFF;
-	bytes[3] = (CEC_VENDOR_ID_BROADCOM >> 0) & 0xFF;
-	if (vc_cec_send_message(CEC_BROADCAST_ADDR,
-			bytes, 4, VC_TRUE) != 0) {
+	if(vc_cec_set_vendor_id(CEC_VENDOR_ID_BROADCOM) != 0) {
 		spdlog::error("Failed to reply with vendor ID.");
 	}
 }
@@ -168,11 +224,7 @@ bool parseCECMessage(VC_CEC_MESSAGE_T &message, uint32_t reason, uint32_t param1
 	int retval = vc_cec_param2message(reason, param1, param2, param3, param4, &message);
 	bool success = 0 == retval;
 
-	string content = "";
-	for (size_t i = 0; i < message.length; i++)
-	{
-		content += fmt::format("{:X} ", message.payload[i]);
-	}
+	string content = getOpcodeString(message.payload, message.length);
 
 	if(success) {
 		spdlog::debug(
@@ -396,6 +448,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (!initCEC()) {
+		return 1;
+	}
+
+	if (!initFIFO(systemStandby, systemActive)) {
 		return 1;
 	}
 

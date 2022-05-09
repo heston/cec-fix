@@ -55,6 +55,7 @@ void handleSIGIO(int s) {
             f_callback cb = * off_callback;
             cb();
         }
+        return;
     }
 
     if (strncmp(buffer, ON_COMMAND, 1) == 0) {
@@ -63,7 +64,10 @@ void handleSIGIO(int s) {
             f_callback cb = * on_callback;
             cb();
         }
+        return;
     }
+
+    spdlog::warn("Unknown command received on FIFO: {}", buffer);
 }
 
 /**
