@@ -42,11 +42,13 @@ void handleSIGIO(int s) {
 
     spdlog::debug("handleSIGIO called");
 
-    if(read(fifo_fd, buffer, FIFO_COMMAND_SIZE) == -1) {
+    if(read(fifo_fd, buffer, FIFO_COMMAND_SIZE) < 1) {
         spdlog::error("FIFO read error");
     };
 
-    if (strcmp(buffer, OFF_COMMAND)) {
+    spdlog::debug("FIFO read buffer: '{}'", buffer);
+
+    if (strcmp(buffer, OFF_COMMAND) == 0) {
         spdlog::debug("Remote OFF command received on FIFO");
         if (off_callback) {
             f_callback cb = * off_callback;
@@ -54,7 +56,7 @@ void handleSIGIO(int s) {
         }
     }
 
-    if (strcmp(buffer, ON_COMMAND)) {
+    if (strcmp(buffer, ON_COMMAND) == 0) {
         spdlog::debug("Remote ON command received on FIFO");
         if (on_callback) {
             f_callback cb = * on_callback;
@@ -101,9 +103,23 @@ int initFIFO(f_callback off_callback, f_callback on_callback) {
 
     spdlog::debug("fd open at {}", fifo_fd);
 
-    fcntl(fifo_fd, F_SETOWN, getpid()); // set PID of the receiving process
-    fcntl(fifo_fd, F_SETFL, fcntl(fifo_fd, F_GETFL) | O_ASYNC); // enable asynchronous beahviour
-    fcntl(fifo_fd, F_SETSIG, SIGIO); // set the signal that is sent when the kernel tell us that there is a read/write on the fifo.
+    // set PID of the receiving process
+    if(fcntl(fifo_fd, F_SETOWN, getpid()) != 0) {
+        spdlog::error("Could not set owner on fd: {}: {}", fifo_fd, strerror(errno));
+        return -1;
+    }
+
+    // enable asynchronous beahviour
+    if(fcntl(fifo_fd, F_SETFL, fcntl(fifo_fd, F_GETFL) | O_ASYNC) != 0) {
+        spdlog::error("Could not set O_ASYNC on fd: {}: {}", fifo_fd, strerror(errno));
+        return -1;
+    }
+
+    // set the signal that is sent when the kernel tell us that there is a read/write on the fifo.
+    if(fcntl(fifo_fd, F_SETSIG, SIGIO) !=0) {
+        spdlog::error("Could not set signal SIGIO on fd: {}: {}", fifo_fd, strerror(errno));
+        return -1;
+    };
 
     return 1;
 }
