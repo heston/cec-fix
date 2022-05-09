@@ -32,7 +32,7 @@ int systemActive() {
 	return 1;
 }
 
-string getOpcodeString(uint8_t* payload, int length) {
+string getOpcodeString(uint8_t* payload, size_t length) {
 	string content = "";
 	for (size_t i = 0; i < length; i++)
 	{
