@@ -43,12 +43,13 @@ void handleSIGIO(int s) {
     spdlog::debug("handleSIGIO called");
 
     if(read(fifo_fd, buffer, FIFO_COMMAND_SIZE) < 1) {
-        spdlog::error("FIFO read error");
+        spdlog::debug("FIFO buffer is empty");
+        return;
     };
 
     spdlog::debug("FIFO read buffer: '{}'", buffer);
 
-    if (strcmp(buffer, OFF_COMMAND) == 0) {
+    if (strncmp(buffer, OFF_COMMAND, 1) == 0) {
         spdlog::debug("Remote OFF command received on FIFO");
         if (off_callback) {
             f_callback cb = * off_callback;
@@ -56,7 +57,7 @@ void handleSIGIO(int s) {
         }
     }
 
-    if (strcmp(buffer, ON_COMMAND) == 0) {
+    if (strncmp(buffer, ON_COMMAND, 1) == 0) {
         spdlog::debug("Remote ON command received on FIFO");
         if (on_callback) {
             f_callback cb = * on_callback;
