@@ -16,6 +16,8 @@ bool want_run = true;
 // Mapping of logical to physical addresses
 unordered_map<CEC_AllDevices_T, uint8_t*> addressMap { 0 };
 
+const char OSD_NAME[] { "JVC NX7" };
+
 /**
  * Return string representation of a message payload.
  *
@@ -90,7 +92,10 @@ void setStreamPathToPlayback1() {
  * @return  bool
  */
 bool isReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
-	return message.payload[0] == CEC_Opcode_ReportPhysicalAddress;
+	return (
+		message.length > 1 &&
+		message.payload[0] == CEC_Opcode_ReportPhysicalAddress
+	);
 }
 
 /**
@@ -254,7 +259,7 @@ void replyWithPowerStatus(int requestor) {
  */
 int systemStandby() {
 	spdlog::debug("systemStandby called");
-	// turnOffTV();
+	turnOffTV();
 	broadcastStandby();
 	return 1;
 }
@@ -264,7 +269,7 @@ int systemStandby() {
  */
 int systemActive() {
 	spdlog::debug("systemActive called");
-	// turnOnTV();
+	turnOnTV();
 	setStreamPathToPlayback1();
 	return 1;
 }
@@ -293,6 +298,18 @@ bool parseCECMessage(VC_CEC_MESSAGE_T &message, uint32_t reason, uint32_t param1
 	}
 
 	return success;
+}
+
+bool isGiveOSDName(VC_CEC_MESSAGE_T &message) {
+	return (
+		message.length == 1 &&
+		message.payload[0] == CEC_Opcode_GiveOSDName
+	);
+}
+
+void setOSDName() {
+	spdlog::info("Replying with OSD name: {}", OSD_NAME);
+	vc_cec_set_osd_name(OSD_NAME);
 }
 
 /**
@@ -367,6 +384,12 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 	if(isReportPhysicalAddress(message)) {
 		spdlog::info("Rerport physical address message received.");
 		handleReportPhysicalAddress(message);
+		return;
+	}
+
+	if (isGiveOSDName(message)) {
+		spdlog::info("Give OSD name message received.");
+		setOSDName();
 		return;
 	}
 }
