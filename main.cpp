@@ -382,7 +382,7 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 	}
 
 	if(isReportPhysicalAddress(message)) {
-		spdlog::info("Rerport physical address message received.");
+		spdlog::info("Report physical address message received.");
 		handleReportPhysicalAddress(message);
 		return;
 	}
@@ -455,7 +455,7 @@ bool initCEC() {
 	}
 
 	// vc_cec_register_command(CEC_Opcode_GivePhysicalAddress);
-	// vc_cec_register_command(CEC_Opcode_GiveDeviceVendorID);
+	vc_cec_register_command(CEC_Opcode_GiveDeviceVendorID);
 	vc_cec_register_command(CEC_Opcode_GiveOSDName);
 	// vc_cec_register_command(CEC_Opcode_GetCECVersion);
 	vc_cec_register_command(CEC_Opcode_GiveDevicePowerStatus);
