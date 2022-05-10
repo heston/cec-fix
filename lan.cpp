@@ -23,7 +23,7 @@ char HOST[15];
 const int SOCK_TIMEOUT_S = 5;
 const int SOCK_TIMEOUT_MS = SOCK_TIMEOUT_S * 1000;
 const int MAX_RESPONSE_SIZE = 4096;
-const int MAX_RETRY_COUNT = 3;
+const int MAX_RETRY_COUNT = 5;
 
 const int POWER_QUERY_TTL_MS = 10000;
 
