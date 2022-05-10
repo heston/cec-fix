@@ -454,13 +454,13 @@ bool initCEC() {
 		return false;
 	}
 
-	vc_cec_register_command(CEC_Opcode_GivePhysicalAddress);
-	vc_cec_register_command(CEC_Opcode_GiveDeviceVendorID);
+	// vc_cec_register_command(CEC_Opcode_GivePhysicalAddress);
+	// vc_cec_register_command(CEC_Opcode_GiveDeviceVendorID);
 	vc_cec_register_command(CEC_Opcode_GiveOSDName);
-	vc_cec_register_command(CEC_Opcode_GetCECVersion);
+	// vc_cec_register_command(CEC_Opcode_GetCECVersion);
 	vc_cec_register_command(CEC_Opcode_GiveDevicePowerStatus);
-	vc_cec_register_command(CEC_Opcode_MenuRequest);
-	vc_cec_register_command(CEC_Opcode_GetMenuLanguage);
+	// vc_cec_register_command(CEC_Opcode_MenuRequest);
+	// vc_cec_register_command(CEC_Opcode_GetMenuLanguage);
 
 	if (vc_cec_set_logical_address(CEC_AllDevices_eTV, CEC_DeviceType_TV, CEC_VENDOR_ID_BROADCOM) != 0) {
 		spdlog::critical("Failed to set logical address");
