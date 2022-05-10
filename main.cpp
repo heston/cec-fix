@@ -54,12 +54,12 @@ void getPhysicalAddress(CEC_AllDevices follower) {
  * @param uint8_t * physicalAddress Array of bytes representing a device's physical address.
  */
 void setStreamPath(uint8_t * physicalAddress) {
-	string path = getOpcodeString(physicalAddress, 2);
+	string path = getOpcodeString(physicalAddress, 3);
 	spdlog::info("Set stream path to: {}", path);
 	uint8_t bytes[3];
 	bytes[0] = CEC_Opcode_SetStreamPath;
-	bytes[1] = physicalAddress[0];
-	bytes[2] = physicalAddress[1];
+	bytes[1] = physicalAddress[1];
+	bytes[2] = physicalAddress[2];
 	if (vc_cec_send_message(CEC_BROADCAST_ADDR,
 			bytes, 3, VC_FALSE) != 0) {
 		spdlog::error( "Failed to set stream path.");
@@ -528,5 +528,5 @@ int main(int argc, char *argv[]) {
 		pause();
 	}
 
-	return 0;
+	return cleanupFIFO();;
 }
