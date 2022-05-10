@@ -124,7 +124,7 @@ void handleReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
 	addressMap[message.initiator] = addressPtr;
 
 	if (want_set_stream_path) {
-		setStreamPath(message.payload);
+		setStreamPath(addressPtr);
 		want_set_stream_path = false;
 	}
 }
@@ -493,6 +493,9 @@ bool initCEC() {
 		spdlog::critical("Failed to set logical address");
 		return false;
 	}
+
+	// Cache the physical address of Playback 1
+	getPhysicalAddress(CEC_AllDevices_eDVD1);
 
 	spdlog::debug("CEC init successful");
 	return true;
