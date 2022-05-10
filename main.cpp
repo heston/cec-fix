@@ -123,6 +123,9 @@ void handleReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
 	addressPtr[1] = message.payload[2];
 	addressMap[message.initiator] = addressPtr;
 
+	content = getOpcodeString(addressPtr, 2);
+	spdlog::debug("Set physical address to `{}` for logical address `{}`", content, message.initiator);
+
 	if (want_set_stream_path) {
 		setStreamPath(addressPtr);
 		want_set_stream_path = false;
@@ -550,8 +553,8 @@ bool initLAN(int argc, char *argv[]) {
  * @param   char  argv  Not used
  *
  * @return  int         0: process exited normally.
- * 						1: process exited due to critical CEC error.
- * 						2: process exited due to critical LAN error.
+ * 						1: process exited due to critical CEC or LAN init error.
+ * 						-1: process failed to cleanup FIFO on exit.
  */
 int main(int argc, char *argv[]) {
 	spdlog::set_level(spdlog::level::debug); // Set global log level to debug
