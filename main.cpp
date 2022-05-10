@@ -56,12 +56,12 @@ void getPhysicalAddress(CEC_AllDevices follower) {
  * @param uint8_t * physicalAddress Array of bytes representing a device's physical address.
  */
 void setStreamPath(uint8_t * physicalAddress) {
-	string path = getOpcodeString(physicalAddress, 3);
+	string path = getOpcodeString(physicalAddress, 2);
 	spdlog::info("Set stream path to: {}", path);
 	uint8_t bytes[3];
 	bytes[0] = CEC_Opcode_SetStreamPath;
-	bytes[1] = physicalAddress[1];
-	bytes[2] = physicalAddress[2];
+	bytes[1] = physicalAddress[0];
+	bytes[2] = physicalAddress[1];
 	if (vc_cec_send_message(CEC_BROADCAST_ADDR,
 			bytes, 3, VC_FALSE) != 0) {
 		spdlog::error( "Failed to set stream path.");
@@ -83,7 +83,9 @@ void setStreamPathToPlayback1() {
 		getPhysicalAddress(CEC_AllDevices_eDVD1);
 		return;
 	}
-	setStreamPath(address);
+	if (address) {
+		setStreamPath(address);
+	}
 }
 
 /**
@@ -106,7 +108,20 @@ bool isReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
 void handleReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
 	string content = getOpcodeString(message.payload, message.length);
 	spdlog::debug("handleReportPhysicalAddress: {}:{}", message.initiator, content);
-	addressMap[message.initiator] = message.payload;
+
+	// If an existing address exists, free the underlying int array.
+	try {
+		uint8_t * existingAddressPtr = addressMap.at(message.initiator);
+		addressMap.erase(message.initiator);
+		delete existingAddressPtr;
+	} catch(const out_of_range &e) { }
+
+	// Set (or replace) the address of the initiator
+	uint8_t * addressPtr = new uint8_t[2];
+	// Byte 0 of the payload is the command. Bytes 1-2 are the physical address.
+	addressPtr[0] = message.payload[1];
+	addressPtr[1] = message.payload[2];
+	addressMap[message.initiator] = addressPtr;
 
 	if (want_set_stream_path) {
 		setStreamPath(message.payload);
