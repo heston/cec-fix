@@ -76,7 +76,7 @@ void handleSIGIO(int s) {
  * @param f_callback    off_callback    Callback function pointer to call when OFF message is received.
  * @param f_callback    on_callback     Callback function pointer to call when ON message is received.  
  *
- * @return  int     1 if init was successful.
+ * @return  int     1 if init was successful. -1 otherwise.
  */
 int initFIFO(f_callback off_callback, f_callback on_callback) {
     registerOffCallback(off_callback);
@@ -114,13 +114,13 @@ int initFIFO(f_callback off_callback, f_callback on_callback) {
         return -1;
     }
 
-    // enable asynchronous beahviour
+    // enable asynchronous behavior
     if(fcntl(fifo_fd, F_SETFL, fcntl(fifo_fd, F_GETFL) | O_ASYNC) != 0) {
         spdlog::error("Could not set O_ASYNC on fd: {}: {}", fifo_fd, strerror(errno));
         return -1;
     }
 
-    // set the signal that is sent when the kernel tell us that there is a read/write on the fifo.
+    // set the signal that is sent when the kernel tells us that there is a read/write on the fifo.
     if(fcntl(fifo_fd, F_SETSIG, SIGIO) !=0) {
         spdlog::error("Could not set signal SIGIO on fd: {}: {}", fifo_fd, strerror(errno));
         return -1;

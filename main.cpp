@@ -115,7 +115,7 @@ void handleReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
 }
 
 /**
- * Turn off the TV by sending the correct IR sequence.
+ * Turn off the TV.
  *
  * @return  void
  */
@@ -131,7 +131,7 @@ void turnOffTV() {
 }
 
 /**
- * Turn on the TV by sending the correct IR sequence.
+ * Turn on the TV.
  *
  * @return  void
  */
@@ -300,6 +300,13 @@ bool parseCECMessage(VC_CEC_MESSAGE_T &message, uint32_t reason, uint32_t param1
 	return success;
 }
 
+/**
+ * Whether a CEC message is request for the OSD name.
+ *
+ * @param VC_CEC_MESSAGE_T &message The CEC message.
+ *
+ * @return  bool
+ */
 bool isGiveOSDName(VC_CEC_MESSAGE_T &message) {
 	return (
 		message.length == 1 &&
@@ -307,6 +314,9 @@ bool isGiveOSDName(VC_CEC_MESSAGE_T &message) {
 	);
 }
 
+/**
+ * Reply to a GiveOSDName request.
+ */
 void setOSDName() {
 	spdlog::info("Replying with OSD name: {}", OSD_NAME);
 	vc_cec_set_osd_name(OSD_NAME);
@@ -454,13 +464,15 @@ bool initCEC() {
 		return false;
 	}
 
+	// TODO: these probably aren't needed.
 	// vc_cec_register_command(CEC_Opcode_GivePhysicalAddress);
-	vc_cec_register_command(CEC_Opcode_GiveDeviceVendorID);
-	vc_cec_register_command(CEC_Opcode_GiveOSDName);
-	// vc_cec_register_command(CEC_Opcode_GetCECVersion);
-	vc_cec_register_command(CEC_Opcode_GiveDevicePowerStatus);
 	// vc_cec_register_command(CEC_Opcode_MenuRequest);
 	// vc_cec_register_command(CEC_Opcode_GetMenuLanguage);
+	// vc_cec_register_command(CEC_Opcode_GetCECVersion);
+	vc_cec_register_command(CEC_Opcode_GiveDeviceVendorID);
+	vc_cec_register_command(CEC_Opcode_GiveOSDName);
+	vc_cec_register_command(CEC_Opcode_GiveDevicePowerStatus);
+
 
 	if (vc_cec_set_logical_address(CEC_AllDevices_eTV, CEC_DeviceType_TV, CEC_VENDOR_ID_BROADCOM) != 0) {
 		spdlog::critical("Failed to set logical address");
