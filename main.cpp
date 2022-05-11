@@ -28,10 +28,16 @@ const char OSD_NAME[] { "JVC NX7" };
  */
 string getOpcodeString(uint8_t* payload, size_t length) {
 	string content = "";
-	for (size_t i = 0; i < length; i++)
-	{
+
+	if (!length) {
+		return content;
+	}
+
+	for (size_t i = 0; i < length; i++) {
 		content += fmt::format("{:X} ", payload[i]);
 	}
+
+	content.pop_back();  // Remove trailing space
 	return content;
 }
 
