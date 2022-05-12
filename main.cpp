@@ -1,5 +1,6 @@
 #include <bcm_host.h>
 #include <iostream>
+#include <stdexcept>
 #include <unistd.h>
 #include <stdlib.h>
 #include "spdlog/spdlog.h"
@@ -144,10 +145,16 @@ void handleReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
  * @return  void
  */
 void turnOffTV() {
-	if (isOff()) {
-		spdlog::info("TV is already off!");
+	try {
+		if (isOff()) {
+			spdlog::info("TV is already off!");
+			return;
+		}
+	} catch(const runtime_error& e) {
+		spdlog::warn("Exception caught in turnOffTV: {}", e.what());
 		return;
 	}
+
 	spdlog::info("Turning off the TV");
 	if(sendOff() == 0) {
 		spdlog::info("TV turned off");
@@ -160,8 +167,14 @@ void turnOffTV() {
  * @return  void
  */
 void turnOnTV() {
-	if (isOn()) {
-		spdlog::info("TV is already on!");
+
+	try {
+		if (isOn()) {
+			spdlog::info("TV is already on!");
+			return;
+		}
+	} catch(const runtime_error& e) {
+		spdlog::warn("Exception caught in turnOnTV: {}", e.what());
 		return;
 	}
 
