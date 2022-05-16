@@ -280,7 +280,14 @@ bool isRequestForPowerStatus(VC_CEC_MESSAGE_T &message) {
  * @return  void
  */
 void replyWithPowerStatus(int requestor) {
-	bool tv_is_on = isOn();
+	bool tv_is_on;
+	try {
+		tv_is_on = isOn();
+	} catch(const runtime_error& e) {
+		spdlog::warn("Exception caught in replyWithPowerStatus: {}", e.what());
+		return;
+	}
+
 	spdlog::info("Replying with power status: {}", tv_is_on);
 	uint8_t bytes[2];
 	bytes[0] = CEC_Opcode_ReportPowerStatus;
