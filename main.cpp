@@ -593,7 +593,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	if (!initFIFO(systemStandby, systemActive)) {
+	if (initFIFO(systemStandby, systemActive) < 0) {
 		return 1;
 	}
 
