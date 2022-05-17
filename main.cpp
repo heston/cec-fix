@@ -152,7 +152,7 @@ void turnOffTV() {
 		}
 	} catch(const runtime_error& e) {
 		spdlog::warn("Exception caught in turnOffTV: {}", e.what());
-		return;
+		// Assume TV is on
 	}
 
 	spdlog::info("Turning off the TV");
@@ -175,7 +175,7 @@ void turnOnTV() {
 		}
 	} catch(const runtime_error& e) {
 		spdlog::warn("Exception caught in turnOnTV: {}", e.what());
-		return;
+		// Assume TV is off
 	}
 
 	spdlog::info("Turning on the TV");

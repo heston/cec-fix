@@ -211,7 +211,7 @@ int queryPowerStatus() {
             spdlog::debug("Power status is EMERGENCY");
             return 4;
         }
-        spdlog::warn("Unknown power status encountered");
+        spdlog::error("Unknown power status encountered.");
     }
     return -1;
 }
