@@ -259,7 +259,7 @@ int sendOff() {
     const int cmdSize = sizeof(OFF_COMMAND);
     int ret = sendCommandWithRetry(HOST, OFF_COMMAND, cmdSize, response);
     if(ret < 0) {
-        spdlog::error("Error communicating with host: ", ret);
+        spdlog::error("Error communicating with host: {}", ret);
         return ret;
     }
     queryPowerStatusCacheClear();
