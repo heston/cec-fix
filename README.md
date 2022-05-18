@@ -61,3 +61,16 @@ Uninstalling
 Compatibility
 -------------
 This was tested on a Raspberry Pi Zero W running Rapsian Bullseye. Older versions of Raspian should also work, as should similar Raspberry Pi hardware generations (e.g. B, A, B+). However, this has not been verified.
+
+Interprocess Control
+--------------------
+It is possible for other running processes on the Raspberry Pi to control the theater system over a named pipe (FIFO).
+When running, a named pipe is created at `/tmp/p-cec-fix`. Another process can write to this pipe to turn the system
+on and off (assuming the default playback device is at logical address 4).
+
+To turn the system on, and set the active source to Playback Device 1 (logical address 4), write "1" to the pipe.
+
+To turn the system off (set all devices to standby), write "0" to the pipe.
+
+To see an example of a Python process controlling the system in response to Google Assistant voice commands,
+look at [Theater Commander](https://github.com/heston/theater-commander) and [Theater Commander Server](https://github.com/heston/theater-commander-server).
