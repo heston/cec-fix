@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <stdio.h>
-#include <string.h>
+#include <stdexcept>
+#include <string>
 #include <sys/socket.h>
 #include <unistd.h>
 #include "spdlog/spdlog.h"
@@ -23,7 +24,7 @@ char HOST[15];
 const int SOCK_TIMEOUT_S = 5;
 const int SOCK_TIMEOUT_MS = SOCK_TIMEOUT_S * 1000;
 const int MAX_RESPONSE_SIZE = 4096;
-const int MAX_RETRY_COUNT = 3;
+const int MAX_RETRY_COUNT = 5;
 
 const int POWER_QUERY_TTL_MS = 10000;
 
@@ -40,8 +41,15 @@ const unsigned char EMERGENCY_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A, 0x40, 
 
 const unsigned char NULL_COMMAND[] {0x21, 0x89, 0x01, 0x00, 0x00, 0x0A};
 
+bool has_active_connection = false;
+
 
 int sendCommand(const char* host, const unsigned char* code, int codeLen, unsigned char* response) {
+    if(has_active_connection) {
+        spdlog::warn("Active connection to host already established. Only one is allowed at a time. Aborting.");
+        return -9;
+    }
+
     int sock { 0 };
     struct sockaddr_in serv_addr;
 
@@ -51,6 +59,8 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
     int retCode { 0 };
 
     do {
+        has_active_connection = true;
+
         if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
             spdlog::error("Socket creation error");
             retCode = -1;
@@ -150,6 +160,7 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
     close(sock);
     // Wait for host to close other end
     this_thread::sleep_for(chrono::seconds(1));
+    has_active_connection = false;
     return retCode;
 }
 
@@ -200,7 +211,7 @@ int queryPowerStatus() {
             spdlog::debug("Power status is EMERGENCY");
             return 4;
         }
-        spdlog::warn("Unknown power status encountered");
+        spdlog::error("Unknown power status encountered.");
     }
     return -1;
 }
@@ -269,11 +280,19 @@ int sendNull() {
 
 bool isOn() {
     int status = queryPowerStatusCached();
+    if (status < 0) {
+        throw runtime_error("Networking error: " + std::to_string(status));
+    }
+
     return status == 1 || status == 3;
 }
 
 bool isOff() {
     int status = queryPowerStatusCached();
+    if (status < 0) {
+        throw runtime_error("Networking error: " + std::to_string(status));
+    }
+
     return status == 0 || status == 2;
 }
 

@@ -1,26 +1,160 @@
 #include <bcm_host.h>
 #include <iostream>
+#include <stdexcept>
 #include <unistd.h>
 #include <stdlib.h>
 #include "spdlog/spdlog.h"
 #include <string.h>
 #include <signal.h>
+#include <unordered_map>
 #include "lan.hpp"
+#include "fifo.hpp"
 
 using namespace std;
 
 bool want_run = true;
 
+// Mapping of logical to physical addresses
+unordered_map<CEC_AllDevices_T, uint8_t*> addressMap { 0 };
+
+const char OSD_NAME[] { "JVC NX7" };
+
 /**
- * Turn off the TV by sending the correct IR sequence.
+ * Return string representation of a message payload.
+ *
+ * @param unit8_t * payload The message payload as an array of bytes.
+ * @param size_t length The length of the message.
+ *
+ * @return  string
+ */
+string getOpcodeString(uint8_t* payload, size_t length) {
+	string content = "";
+
+	if (!length) {
+		return content;
+	}
+
+	for (size_t i = 0; i < length; i++) {
+		content += fmt::format("{:X} ", payload[i]);
+	}
+
+	content.pop_back();  // Remove trailing space
+	return content;
+}
+
+/**
+ * Request the physical address of a logical address.
+ *
+ * @param CEC_AllDevices follower Logical address of the device.
+ */
+void getPhysicalAddress(CEC_AllDevices follower) {
+	spdlog::info("Get physical address for {}", follower);
+	uint8_t bytes[1];
+	bytes[0] = CEC_Opcode_GivePhysicalAddress;
+	if (vc_cec_send_message(follower,
+			bytes, 1, VC_FALSE) != 0) {
+		spdlog::error( "Failed to request physical address.");
+	}
+}
+
+/**
+ * Set the stream path to a physical address.
+ *
+ * @param uint8_t * physicalAddress Array of bytes representing a device's physical address.
+ */
+void setStreamPath(uint8_t * physicalAddress) {
+	string path = getOpcodeString(physicalAddress, 2);
+	spdlog::info("Set stream path to: {}", path);
+	uint8_t bytes[3];
+	bytes[0] = CEC_Opcode_SetStreamPath;
+	bytes[1] = physicalAddress[0];
+	bytes[2] = physicalAddress[1];
+	if (vc_cec_send_message(CEC_BROADCAST_ADDR,
+			bytes, 3, VC_FALSE) != 0) {
+		spdlog::error( "Failed to set stream path.");
+	}
+}
+
+// Marker to remember if we are waiting on a physical address to set the stream path.
+bool want_set_stream_path = false;
+
+/**
+ * Set the stream path to Playback1 device.
+ */
+void setStreamPathToPlayback1() {
+	uint8_t * address;
+	try {
+		address = addressMap.at(CEC_AllDevices_eDVD1);
+	} catch(const out_of_range &e) {
+		want_set_stream_path = true;
+		getPhysicalAddress(CEC_AllDevices_eDVD1);
+		return;
+	}
+	if (address) {
+		setStreamPath(address);
+	}
+}
+
+/**
+ * Whether a CEC message is a device reporting physical address.
+ *
+ * @return  bool
+ */
+bool isReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
+	return (
+		message.length > 1 &&
+		message.payload[0] == CEC_Opcode_ReportPhysicalAddress
+	);
+}
+
+/**
+ * Handler for a CEC message that reports a device's physical address.
+ *
+ * @param VC_CEC_MESSAGE_T message The message to parse.
+ */
+void handleReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
+	string content = getOpcodeString(message.payload, message.length);
+	spdlog::debug("handleReportPhysicalAddress: {}:{}", message.initiator, content);
+
+	// If an existing address exists, free the underlying int array.
+	try {
+		uint8_t * existingAddressPtr = addressMap.at(message.initiator);
+		addressMap.erase(message.initiator);
+		delete existingAddressPtr;
+	} catch(const out_of_range &e) { }
+
+	// Set (or replace) the address of the initiator
+	uint8_t * addressPtr = new uint8_t[2];
+	// Byte 0 of the payload is the command. Bytes 1-2 are the physical address.
+	addressPtr[0] = message.payload[1];
+	addressPtr[1] = message.payload[2];
+	addressMap[message.initiator] = addressPtr;
+
+	content = getOpcodeString(addressPtr, 2);
+	spdlog::debug("Set physical address to `{}` for logical address `{}`", content, message.initiator);
+
+	if (want_set_stream_path) {
+		setStreamPath(addressPtr);
+		want_set_stream_path = false;
+	}
+}
+
+/**
+ * Turn off the TV.
  *
  * @return  void
  */
 void turnOffTV() {
-	if (isOff()) {
-		spdlog::info("TV is already off!");
-		return;
+	try {
+		if (isOff()) {
+			spdlog::info("TV is already off!");
+			return;
+		}
+	} catch(const runtime_error& e) {
+		spdlog::warn("Exception caught in turnOffTV: {}", e.what());
+		// Assume TV is on
 	}
+
 	spdlog::info("Turning off the TV");
 	if(sendOff() == 0) {
 		spdlog::info("TV turned off");
@@ -28,14 +162,20 @@ void turnOffTV() {
 }
 
 /**
- * Turn on the TV by sending the correct IR sequence.
+ * Turn on the TV.
  *
  * @return  void
  */
 void turnOnTV() {
-	if (isOn()) {
-		spdlog::info("TV is already on!");
-		return;
+
+	try {
+		if (isOn()) {
+			spdlog::info("TV is already on!");
+			return;
+		}
+	} catch(const runtime_error& e) {
+		spdlog::warn("Exception caught in turnOnTV: {}", e.what());
+		// Assume TV is off
 	}
 
 	spdlog::info("Turning on the TV");
@@ -83,10 +223,8 @@ bool isTVOffCmd(VC_CEC_MESSAGE_T &message) {
  */
 void broadcastStandby() {
 	spdlog::info("Broadcasting standby");
-	uint8_t bytes[1];
-	bytes[0] = CEC_Opcode_Standby;
-	if (vc_cec_send_message(CEC_BROADCAST_ADDR,
-			bytes, 1, VC_FALSE) != 0) {
+
+	if (vc_cec_send_Standby(CEC_BROADCAST_ADDR, false) != 0) {
 		spdlog::error( "Failed to broadcast standby command.");
 	}
 }
@@ -114,13 +252,7 @@ bool isRequestForVendorId(VC_CEC_MESSAGE_T &message) {
  */
 void broadcastVendorId() {
 	spdlog::info("Broadcasting Vendor ID {}", CEC_VENDOR_ID_BROADCOM);
-	uint8_t bytes[4];
-	bytes[0] = CEC_Opcode_DeviceVendorID;
-	bytes[1] = (CEC_VENDOR_ID_BROADCOM >> 16) & 0xFF;
-	bytes[2] = (CEC_VENDOR_ID_BROADCOM >> 8) & 0xFF;
-	bytes[3] = (CEC_VENDOR_ID_BROADCOM >> 0) & 0xFF;
-	if (vc_cec_send_message(CEC_BROADCAST_ADDR,
-			bytes, 4, VC_TRUE) != 0) {
+	if(vc_cec_set_vendor_id(CEC_VENDOR_ID_BROADCOM) != 0) {
 		spdlog::error("Failed to reply with vendor ID.");
 	}
 }
@@ -148,7 +280,14 @@ bool isRequestForPowerStatus(VC_CEC_MESSAGE_T &message) {
  * @return  void
  */
 void replyWithPowerStatus(int requestor) {
-	bool tv_is_on = isOn();
+	bool tv_is_on;
+	try {
+		tv_is_on = isOn();
+	} catch(const runtime_error& e) {
+		spdlog::warn("Exception caught in replyWithPowerStatus: {}", e.what());
+		return;
+	}
+
 	spdlog::info("Replying with power status: {}", tv_is_on);
 	uint8_t bytes[2];
 	bytes[0] = CEC_Opcode_ReportPowerStatus;
@@ -160,6 +299,26 @@ void replyWithPowerStatus(int requestor) {
 }
 
 /**
+ * Set the entire system to standby.
+ */
+int systemStandby() {
+	spdlog::debug("systemStandby called");
+	turnOffTV();
+	broadcastStandby();
+	return 1;
+}
+
+/**
+ * Turns on the entire system and set active source to Playback 1.
+ */
+int systemActive() {
+	spdlog::debug("systemActive called");
+	turnOnTV();
+	setStreamPathToPlayback1();
+	return 1;
+}
+
+/**
  * Parse a CEC callback into a VC_CEC_MESSAGE_T struct.
  *
  * @return  bool    true if parsing was successful, false otherwise.
@@ -168,11 +327,7 @@ bool parseCECMessage(VC_CEC_MESSAGE_T &message, uint32_t reason, uint32_t param1
 	int retval = vc_cec_param2message(reason, param1, param2, param3, param4, &message);
 	bool success = 0 == retval;
 
-	string content = "";
-	for (size_t i = 0; i < message.length; i++)
-	{
-		content += fmt::format("{:X} ", message.payload[i]);
-	}
+	string content = getOpcodeString(message.payload, message.length);
 
 	if(success) {
 		spdlog::debug(
@@ -187,6 +342,28 @@ bool parseCECMessage(VC_CEC_MESSAGE_T &message, uint32_t reason, uint32_t param1
 	}
 
 	return success;
+}
+
+/**
+ * Whether a CEC message is request for the OSD name.
+ *
+ * @param VC_CEC_MESSAGE_T &message The CEC message.
+ *
+ * @return  bool
+ */
+bool isGiveOSDName(VC_CEC_MESSAGE_T &message) {
+	return (
+		message.length == 1 &&
+		message.payload[0] == CEC_Opcode_GiveOSDName
+	);
+}
+
+/**
+ * Reply to a GiveOSDName request.
+ */
+void setOSDName() {
+	spdlog::info("Replying with OSD name: {}", OSD_NAME);
+	vc_cec_set_osd_name(OSD_NAME);
 }
 
 /**
@@ -257,6 +434,18 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 		replyWithPowerStatus(message.initiator);
 		return;
 	}
+
+	if(isReportPhysicalAddress(message)) {
+		spdlog::info("Report physical address message received.");
+		handleReportPhysicalAddress(message);
+		return;
+	}
+
+	if (isGiveOSDName(message)) {
+		spdlog::info("Give OSD name message received.");
+		setOSDName();
+		return;
+	}
 }
 
 /**
@@ -319,18 +508,23 @@ bool initCEC() {
 		return false;
 	}
 
-	vc_cec_register_command(CEC_Opcode_GivePhysicalAddress);
+	// TODO: these probably aren't needed.
+	// vc_cec_register_command(CEC_Opcode_GivePhysicalAddress);
+	// vc_cec_register_command(CEC_Opcode_MenuRequest);
+	// vc_cec_register_command(CEC_Opcode_GetMenuLanguage);
+	// vc_cec_register_command(CEC_Opcode_GetCECVersion);
 	vc_cec_register_command(CEC_Opcode_GiveDeviceVendorID);
 	vc_cec_register_command(CEC_Opcode_GiveOSDName);
-	vc_cec_register_command(CEC_Opcode_GetCECVersion);
 	vc_cec_register_command(CEC_Opcode_GiveDevicePowerStatus);
-	vc_cec_register_command(CEC_Opcode_MenuRequest);
-	vc_cec_register_command(CEC_Opcode_GetMenuLanguage);
+
 
 	if (vc_cec_set_logical_address(CEC_AllDevices_eTV, CEC_DeviceType_TV, CEC_VENDOR_ID_BROADCOM) != 0) {
 		spdlog::critical("Failed to set logical address");
 		return false;
 	}
+
+	// Cache the physical address of Playback 1
+	getPhysicalAddress(CEC_AllDevices_eDVD1);
 
 	spdlog::debug("CEC init successful");
 	return true;
@@ -385,8 +579,8 @@ bool initLAN(int argc, char *argv[]) {
  * @param   char  argv  Not used
  *
  * @return  int         0: process exited normally.
- * 						1: process exited due to critical CEC error.
- * 						2: process exited due to critical LAN error.
+ * 						1: process exited due to critical CEC or LAN init error.
+ * 						-1: process failed to cleanup FIFO on exit.
  */
 int main(int argc, char *argv[]) {
 	spdlog::set_level(spdlog::level::debug); // Set global log level to debug
@@ -396,6 +590,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (!initCEC()) {
+		return 1;
+	}
+
+	if (initFIFO(systemStandby, systemActive) < 0) {
 		return 1;
 	}
 
@@ -412,5 +610,5 @@ int main(int argc, char *argv[]) {
 		pause();
 	}
 
-	return 0;
+	return cleanupFIFO();;
 }
