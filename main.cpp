@@ -542,7 +542,7 @@ void handleSIGINT(int s) {
 }
 
 /**
- * Set the projector IP address from the command line args, is present.
+ * Set the projector IP address from the command line args, if present.
  *
  * @param   int   argc  argc from main.
  * @param   char  argv  argv from main.
