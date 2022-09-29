@@ -42,8 +42,12 @@ Installation
 ------------
 1. Check out this repo on the Raspberry Pi, as the build references firmware libraries that are only available there.
 1. `cd` into the directory and `make` to build it.
-1. `/build/cec-fix` to run. `CTRL-c` to exit.
-1. To run as a service on boot: `sudo make install`.
+1. `/build/cec-fix PROJECTOR_HOST_IP` to run, where `PROJECTOR_HOST_IP` is the IP address of the JVC projector. `CTRL-c` to exit.
+1. To run as a service on boot:
+    ```
+    echo "PROJECTOR_HOST_IP=xxx.xxx.xxx.xxx" > .env
+    sudo make install
+    ```
 
 **_A note on GPU driver compatibility_**
 

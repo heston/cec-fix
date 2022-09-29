@@ -2,3 +2,4 @@
 .vscode
 firmware-master
 build
+.env
