@@ -573,17 +573,31 @@ bool initLAN(int argc, char *argv[]) {
 }
 
 /**
+ * Get an environment variable as a string.
+ *
+ * @param key The name of the environment variable.
+ * @param default_value The value to return if the requested key is not found in the environment.
+ *
+ * @return  std::string The value of the requested key if present, otherwise an empty string.
+ */
+string getEnvVar(string const & key, string const default_value) {
+	char * val = getenv(key.c_str());
+	return val == NULL ? default_value : string(val);
+}
+
+/**
  * Bootstrap all the things!
  *
- * @param   int   argc  Not used
- * @param   char  argv  Not used
+ * @param   int   argc  Passed to initLAN.
+ * @param   char  argv  Passed to initLAN.
  *
  * @return  int         0: process exited normally.
  * 						1: process exited due to critical CEC or LAN init error.
  * 						-1: process failed to cleanup FIFO on exit.
  */
 int main(int argc, char *argv[]) {
-	spdlog::set_level(spdlog::level::debug); // Set global log level to debug
+	const string log_level = getEnvVar("LOG_LEVEL", "debug");
+	spdlog::set_level(spdlog::level::from_str(log_level)); // Set global log level to debug
 
 	if (!initLAN(argc, argv)) {
 		return 1;
