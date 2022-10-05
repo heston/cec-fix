@@ -550,21 +550,17 @@ void handleSIGINT(int s) {
  * @return  bool        Whether LAN was configured successfully.
  */
 bool initLAN(int argc, char *argv[]) {
-	if (argc == 1) {
-		// No host provided, use default
-		setHost(DEFAULT_HOST);
-		spdlog::info("Projector host is {}", DEFAULT_HOST);
-	} else if (argc == 2) {
+	if (argc == 2) {
 		// Host provided
 		setHost(argv[1]);
 		spdlog::info("Projector host is {}", argv[1]);
 	} else {
-		spdlog::critical("Invalid invocation. First arg must be ip address of host, or omitted to use default.");
+		spdlog::critical("Invalid invocation. First arg must be the IP address of the projector.");
 		return false;
 	}
 
 	if(sendNull() < 0) {
-		spdlog::critical("Could not communicate with projector host.");
+		spdlog::critical("Could not communicate with projector.");
 		return false;
 	}
 
