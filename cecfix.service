@@ -11,6 +11,7 @@ ExecStart={{DIR}}/build/cec-fix ${PROJECTOR_HOST_IP}
 Restart=always
 RestartSec=5
 KillSignal=SIGINT
+RuntimeMaxSec=86400
 
 [Install]
 WantedBy=multi-user.target
