@@ -42,6 +42,7 @@ const unsigned char EMERGENCY_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A, 0x40, 
 const unsigned char NULL_COMMAND[] {0x21, 0x89, 0x01, 0x00, 0x00, 0x0A};
 
 bool has_active_connection = false;
+bool command_in_progress = false;
 
 
 int sendCommand(const char* host, const unsigned char* code, int codeLen, unsigned char* response) {
@@ -165,6 +166,12 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
 }
 
 int sendCommandWithRetry(const char* host, const unsigned char* code, int codeLen, unsigned char* response) {
+    if(command_in_progress) {
+        spdlog::warn("A command is already running. Only one command is allowed at a time. Aborting.");
+        return -9;
+    }
+
+    command_in_progress = true;
     int retCode { -1 };
     int retry { 0 };
     while (retCode < 0 && retry < MAX_RETRY_COUNT) {
@@ -173,6 +180,7 @@ int sendCommandWithRetry(const char* host, const unsigned char* code, int codeLe
         retry++;
     }
 
+    command_in_progress = false;
     return retCode;
 }
 
