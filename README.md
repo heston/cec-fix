@@ -75,6 +75,10 @@ CEC callbacks enqueue notifications for the main loop, which also polls the FIFO
 All projector commands and power-cache updates run on that loop. A stalled projector
 read times out after five seconds; retries can still delay command handling. The
 CEC queue holds 256 notifications and logs any overflow once processing resumes.
+TCP replies are accumulated to their protocol lengths, including separate command
+acknowledgment and power-status frames. Both frames share a five-second deadline;
+fragmented replies cannot extend it. Tests cover split and bytewise replies,
+truncation, malformed frames, and slow replies that exceed the deadline.
 
 Compatibility
 -------------
