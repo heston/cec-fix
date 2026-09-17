@@ -62,6 +62,18 @@ Uninstalling
 ------------
 `sudo make uninstall`
 
+Regression tests
+----------------
+Run `make test` with a C++11 compiler and Python 3. These tests do not require Pi
+hardware. They use a fake projector on `127.0.0.1:20554` and `/tmp/p-cec-fix`, so
+stop any local instance first. The suite covers stalled projector replies, socket
+connection errors, queued CEC notifications, and FIFO command processing/restart.
+
+CEC callbacks enqueue notifications for the main loop, which also polls the FIFO.
+All projector commands and power-cache updates run on that loop. A stalled projector
+read times out after five seconds; retries can still delay command handling. The
+CEC queue holds 256 notifications and logs any overflow once processing resumes.
+
 Compatibility
 -------------
 This was tested on a Raspberry Pi Zero W running Rapsian Bullseye. Older versions of Raspian should also work, as should similar Raspberry Pi hardware generations (e.g. B, A, B+). However, this has not been verified.

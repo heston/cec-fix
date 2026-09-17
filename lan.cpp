@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <string>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/bin_to_hex.h"
@@ -19,7 +20,7 @@ using namespace std;
 #define REQUEST "PJREQ"
 #define ACK "PJACK"
 
-char HOST[15];
+char HOST[INET_ADDRSTRLEN];
 
 const int SOCK_TIMEOUT_S = 5;
 const int SOCK_TIMEOUT_MS = SOCK_TIMEOUT_S * 1000;
@@ -67,10 +68,13 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
             break;
         }
 
-        const void* timeout = &SOCK_TIMEOUT_S;
-        socklen_t len = sizeof(int);
-        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, timeout, len);
-        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, timeout, len);
+        const struct timeval timeout = { SOCK_TIMEOUT_S, 0 };
+        if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0 ||
+            setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+            spdlog::error("Could not set socket timeouts: {}", strerror(errno));
+            retCode = -4;
+            break;
+        }
 
         serv_addr.sin_family = AF_INET;
         serv_addr.sin_port = htons(PORT);
@@ -104,7 +108,7 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
 
         // 1: Projector should send PJ_OK
         if(read(sock, buffer, 4096) == -1) {
-            spdlog::error("Socket read error");
+            spdlog::error("Socket greeting read failed: {}", strerror(errno));
             retCode = -4;
             break;
         };
@@ -123,7 +127,7 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
 
         // 3: Projector should send PJACK
         if(read(sock, buffer, 4096) == -1) {
-            spdlog::error("Socket read error");
+            spdlog::error("Socket handshake read failed: {}", strerror(errno));
             retCode = -4;
             break;
         }
@@ -143,7 +147,7 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
         // Return response to caller
         ssize_t respLen = read(sock, static_cast<void *>(&response_buffer), 4096);
         if( respLen == -1) {
-            spdlog::error("Socket read error");
+            spdlog::error("Socket command response read failed: {}", strerror(errno));
             retCode = -4;
             break;
         }
@@ -297,9 +301,12 @@ bool isOff() {
 }
 
 void setHost(const char * host) {
+    if (strlen(host) >= sizeof(HOST)) {
+        throw invalid_argument("Projector IPv4 address is too long");
+    }
     strcpy(HOST, host);
 }
 
 void setHost(char * host) {
-    strcpy(HOST, host);
+    setHost(static_cast<const char*>(host));
 }
