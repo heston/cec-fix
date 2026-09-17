@@ -64,6 +64,8 @@ Uninstalling
 
 Regression tests
 ----------------
+GitHub Actions runs `make test` on pull requests and pushes to `main` using Ubuntu.
+
 Run `make test` with a C++11 compiler and Python 3. These tests do not require Pi
 hardware. They use a fake projector on `127.0.0.1:20554` and `/tmp/p-cec-fix`, so
 stop any local instance first. The suite covers stalled projector replies, socket
