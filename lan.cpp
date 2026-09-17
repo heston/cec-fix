@@ -262,6 +262,10 @@ int queryPowerStatus() {
     } else {
         const unsigned char status = response[11];
         if (ret == 13 && status >= '0' && status <= '4') {
+            static const char* const status_names[] = {
+                "STANDBY", "POWER_ON", "COOLING", "WARMING", "EMERGENCY"
+            };
+            spdlog::debug("Power status is {}", status_names[status - '0']);
             return status - '0';
         }
         spdlog::error("Unknown power status value: 0x{:02X}", status);
