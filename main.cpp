@@ -7,15 +7,17 @@
 #include <string.h>
 #include <signal.h>
 #include <unordered_map>
+#include <array>
+#include "cec-event-queue.hpp"
 #include "lan.hpp"
 #include "fifo.hpp"
 
 using namespace std;
 
-bool want_run = true;
+volatile sig_atomic_t want_run = 1;
 
 // Mapping of logical to physical addresses
-unordered_map<CEC_AllDevices_T, uint8_t*> addressMap { 0 };
+unordered_map<CEC_AllDevices_T, array<uint8_t, 2>> addressMap;
 
 const char OSD_NAME[] { "JVC NX7" };
 
@@ -84,7 +86,7 @@ bool want_set_stream_path = false;
 void setStreamPathToPlayback1() {
 	uint8_t * address;
 	try {
-		address = addressMap.at(CEC_AllDevices_eDVD1);
+		address = addressMap.at(CEC_AllDevices_eDVD1).data();
 	} catch(const out_of_range &e) {
 		want_set_stream_path = true;
 		getPhysicalAddress(CEC_AllDevices_eDVD1);
@@ -102,7 +104,7 @@ void setStreamPathToPlayback1() {
  */
 bool isReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
 	return (
-		message.length > 1 &&
+		message.length >= 4 &&
 		message.payload[0] == CEC_Opcode_ReportPhysicalAddress
 	);
 }
@@ -116,19 +118,12 @@ void handleReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
 	string content = getOpcodeString(message.payload, message.length);
 	spdlog::debug("handleReportPhysicalAddress: {}:{}", message.initiator, content);
 
-	// If an existing address exists, free the underlying int array.
-	try {
-		uint8_t * existingAddressPtr = addressMap.at(message.initiator);
-		addressMap.erase(message.initiator);
-		delete existingAddressPtr;
-	} catch(const out_of_range &e) { }
-
-	// Set (or replace) the address of the initiator
-	uint8_t * addressPtr = new uint8_t[2];
+	// Store addresses by value; all access takes place on the main loop.
+	auto& address = addressMap[message.initiator];
+	uint8_t * addressPtr = address.data();
 	// Byte 0 of the payload is the command. Bytes 1-2 are the physical address.
 	addressPtr[0] = message.payload[1];
 	addressPtr[1] = message.payload[2];
-	addressMap[message.initiator] = addressPtr;
 
 	content = getOpcodeString(addressPtr, 2);
 	spdlog::debug("Set physical address to `{}` for logical address `{}`", content, message.initiator);
@@ -327,9 +322,8 @@ bool parseCECMessage(VC_CEC_MESSAGE_T &message, uint32_t reason, uint32_t param1
 	int retval = vc_cec_param2message(reason, param1, param2, param3, param4, &message);
 	bool success = 0 == retval;
 
-	string content = getOpcodeString(message.payload, message.length);
-
 	if(success) {
+		string content = getOpcodeString(message.payload, message.length);
 		spdlog::debug(
 			"Translated to message: initiator={initiator:X} follower={follower:X} length={length:d} content={content}",
 			fmt::arg("initiator", message.initiator),
@@ -388,9 +382,16 @@ void setOSDName() {
  *
  * @return void
  */
-void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, uint32_t param2, uint32_t param3, uint32_t param4) {
+CECEventQueue cec_events;
+
+void handleCECCallback(void *, uint32_t reason, uint32_t param1, uint32_t param2, uint32_t param3, uint32_t param4) {
+	cec_events.push({reason, param1, param2, param3, param4});
+}
+
+// Run on the main thread so projector I/O never blocks the firmware callback.
+void processCECEvent(uint32_t reason, uint32_t param1, uint32_t param2, uint32_t param3, uint32_t param4) {
 	spdlog::debug(
-		"Got a callback: reason={reason:X} param1={p1:X} param2={p1:X} param3={p3:X} param4={p4:X}",
+		"Processing CEC callback: reason={reason:X} param1={p1:X} param2={p2:X} param3={p3:X} param4={p4:X}",
 		fmt::arg("reason", reason),
 		fmt::arg("p1", param1),
 		fmt::arg("p2", param2),
@@ -398,7 +399,7 @@ void handleCECCallback(void *callback_data, uint32_t reason, uint32_t param1, ui
 		fmt::arg("p4", param4)
 	);
 
-	VC_CEC_MESSAGE_T message;
+	VC_CEC_MESSAGE_T message = {};
 	if (!parseCECMessage(message, reason, param1, param2, param3, param4)) {
 		return;
 	}
@@ -600,10 +601,12 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (!initCEC()) {
+		vc_vchi_cec_stop();
 		return 1;
 	}
 
 	if (initFIFO(systemStandby, systemActive) < 0) {
+		vc_vchi_cec_stop();
 		return 1;
 	}
 
@@ -617,8 +620,21 @@ int main(int argc, char *argv[]) {
 	spdlog::info("Running! Press CTRL-c to exit.");
 
 	while (want_run) {
-		pause();
+		CECEvent event = {};
+		unsigned int dropped;
+		bool have_event = cec_events.pop(event, dropped);
+		if (dropped) spdlog::warn("CEC event queue full; dropped {} notifications", dropped);
+		if (have_event) {
+			processCECEvent(event.reason, event.param1, event.param2, event.param3, event.param4);
+		}
+		if (processFIFO(have_event ? 0 : 100) < 0) {
+			vc_vchi_cec_stop();
+			cleanupFIFO();
+			return 1;
+		}
 	}
 
-	return cleanupFIFO();;
+	// Join the notification thread before the event queue's static destructor runs.
+	vc_vchi_cec_stop();
+	return cleanupFIFO();
 }
