@@ -6,7 +6,7 @@ all: $(OBJDIR)/cec-fix | $(OBJDIR)/
 $(OBJDIR)/cec-fix: $(OBJDIR)/fifo.o $(OBJDIR)/lan.o $(OBJDIR)/main.o | $(OBJDIR)/
 	g++ -Wall -L/usr/lib $(OBJDIR)/fifo.o $(OBJDIR)/lan.o $(OBJDIR)/main.o -lbcm_host -lvchiq_arm -lvcos -lpthread -o $(OBJDIR)/cec-fix
 
-$(OBJDIR)/main.o: lan.hpp fifo.hpp cec-event-queue.hpp cec-notifications.hpp main.cpp | $(OBJDIR)/
+$(OBJDIR)/main.o: lan.hpp fifo.hpp cec-event-queue.hpp main.cpp | $(OBJDIR)/
 	g++ -Wall -c -I. -Iinclude -I/usr/include -I/opt/vc/include main.cpp -o $(OBJDIR)/main.o
 
 $(OBJDIR)/lan.o: lan.hpp lan.cpp include/socket_with_timeout.h | $(OBJDIR)/
@@ -37,15 +37,11 @@ $(OBJDIR)/cec-queue-regression: tests/cec-queue-regression.cpp cec-event-queue.h
 $(OBJDIR)/socket-timeout-regression: tests/socket-timeout-regression.cpp include/socket_with_timeout.h | $(OBJDIR)/
 	$(CXX) $(CXXFLAGS) tests/socket-timeout-regression.cpp -o $@
 
-$(OBJDIR)/cec-notifications-regression: tests/cec-notifications-regression.cpp cec-notifications.hpp | $(OBJDIR)/
-	$(CXX) $(CXXFLAGS) tests/cec-notifications-regression.cpp -o $@
-
-test: $(OBJDIR)/lan-probe $(OBJDIR)/fifo-regression $(OBJDIR)/cec-queue-regression $(OBJDIR)/socket-timeout-regression $(OBJDIR)/cec-notifications-regression
+test: $(OBJDIR)/lan-probe $(OBJDIR)/fifo-regression $(OBJDIR)/cec-queue-regression $(OBJDIR)/socket-timeout-regression
 	CEC_LAN_PROBE=$(abspath $(OBJDIR))/lan-probe python3 tests/test_lan.py
 	$(OBJDIR)/fifo-regression
 	$(OBJDIR)/cec-queue-regression
 	$(OBJDIR)/socket-timeout-regression
-	$(OBJDIR)/cec-notifications-regression
 
 clean:
 	rm $(OBJDIR)/*

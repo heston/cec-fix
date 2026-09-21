@@ -62,47 +62,6 @@ Uninstalling
 ------------
 `sudo make uninstall`
 
-CEC address diagnostics
------------------------
-The service logs its own logical and physical addresses when the firmware sends
-an allocation notification, for example:
-
-```
-CEC address allocated: logical=0, physical=1.2.0.0
-```
-
-This is a firmware notification, not a malformed CEC message. Release, unavailable
-address, and address-loss notifications are logged separately. An address-loss
-warning does not mean the service has recovered the address automatically.
-Messages saying `Cached physical address` describe other devices in the lookup
-table; they do not set the Pi's address.
-
-The Pi intentionally uses logical address 0 and device type TV. A root TV normally
-has physical address `0.0.0.0`; a Pi connected to a receiver input can instead get
-an address such as `1.2.0.0`. The service warns about that mismatch. The legacy
-[Broadcom API](https://github.com/raspberrypi/userland/blob/master/interface/vmcs_host/vc_cecservice.h)
-documents that `vc_cec_set_logical_address` uses the physical address from EDID;
-it provides a getter but no physical-address setter. Sending a fabricated
-`Report Physical Address` packet alone does not change that firmware state.
-
-The firmware setting `hdmi_force_cec_address` appears in Raspberry Pi diagnostic
-configuration dumps, but its behavior for zero on this setup has not been verified.
-A possible **experimental** boot setting is `hdmi_force_cec_address=0` in the
-active boot `config.txt` (usually `/boot/config.txt` on the legacy setup). Back up
-that file before trying it and reboot afterward. Verify the allocation log says
-`physical=0.0.0.0`; configuration readback alone is not proof. Also capture the
-Pi's on-wire `Report Physical Address` response to check what peers see. Remove
-the setting and reboot to undo the experiment. The service does not edit boot
-configuration or force an address itself.
-
-For volume troubleshooting, capture debug logs while pressing volume up/down.
-`5 -> F: 72 00` means the audio system broadcasts System Audio Mode off; `72 01`
-means on. Volume key presses typically use `44 41` (up), `44 42` (down), followed
-by `45` (release). Check whether they target logical address 5 (receiver) or 0
-(the emulated TV). The service currently does not forward volume commands sent
-to address 0. Absence from this service's log alone does not prove absence on
-the bus: firmware may not deliver traffic addressed to other devices.
-
 Regression tests
 ----------------
 GitHub Actions runs `make test` on pull requests and pushes to `main` using Ubuntu.
