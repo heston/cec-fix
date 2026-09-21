@@ -9,10 +9,16 @@
 #include <unordered_map>
 #include <array>
 #include "cec-event-queue.hpp"
+#include "cec-notifications.hpp"
 #include "lan.hpp"
 #include "fifo.hpp"
 
 using namespace std;
+
+static_assert(cec_notifications::logical_address == VC_CEC_LOGICAL_ADDR &&
+              cec_notifications::topology == VC_CEC_TOPOLOGY &&
+              cec_notifications::logical_address_lost == VC_CEC_LOGICAL_ADDR_LOST,
+              "CEC notification constants must match the firmware API");
 
 volatile sig_atomic_t want_run = 1;
 
@@ -126,7 +132,7 @@ void handleReportPhysicalAddress(VC_CEC_MESSAGE_T &message) {
 	addressPtr[1] = message.payload[2];
 
 	content = getOpcodeString(addressPtr, 2);
-	spdlog::debug("Set physical address to `{}` for logical address `{}`", content, message.initiator);
+	spdlog::debug("Cached physical address `{}` for logical address `{}`", content, message.initiator);
 
 	if (want_set_stream_path) {
 		setStreamPath(addressPtr);
@@ -398,6 +404,11 @@ void processCECEvent(uint32_t reason, uint32_t param1, uint32_t param2, uint32_t
 		fmt::arg("p3", param3),
 		fmt::arg("p4", param4)
 	);
+
+	// Allocation, loss, and topology callbacks are notifications, not CEC frames.
+	if (cec_notifications::handle(reason, param1, param2)) {
+		return;
+	}
 
 	VC_CEC_MESSAGE_T message = {};
 	if (!parseCECMessage(message, reason, param1, param2, param3, param4)) {
