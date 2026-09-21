@@ -3,3 +3,4 @@
 firmware-master
 build
 .env
+__pycache__/

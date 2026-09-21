@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <signal.h>
 
-bool want_run = true;
+volatile sig_atomic_t want_run = 1;
 
 
 int onCallback() {
@@ -53,7 +53,10 @@ int main(int argc, char *argv[]) {
         spdlog::info("Running! Press CTRL-c to exit.");
 
         while (want_run) {
-            pause();
+            if (processFIFO(100) < 0) {
+                ret = 1;
+                break;
+            }
         }
     } while (0);
 

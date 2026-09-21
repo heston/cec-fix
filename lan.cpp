@@ -3,6 +3,8 @@
 #include <stdexcept>
 #include <string>
 #include <sys/socket.h>
+#include <sys/time.h>
+#include <poll.h>
 #include <unistd.h>
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/bin_to_hex.h"
@@ -19,7 +21,7 @@ using namespace std;
 #define REQUEST "PJREQ"
 #define ACK "PJACK"
 
-char HOST[15];
+char HOST[INET_ADDRSTRLEN];
 
 const int SOCK_TIMEOUT_S = 5;
 const int SOCK_TIMEOUT_MS = SOCK_TIMEOUT_S * 1000;
@@ -30,18 +32,76 @@ const int POWER_QUERY_TTL_MS = 10000;
 
 const unsigned char ON_COMMAND[] { 0x21, 0x89, 0x01, 0x50, 0x57, 0x31, 0x0A };
 const unsigned char OFF_COMMAND[] { 0x21, 0x89, 0x01, 0x50, 0x57, 0x30, 0x0A };
-const unsigned char ON_OFF_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A };
-
 const unsigned char QUERY_POWER_COMMAND[] { 0x3F, 0x89, 0x01, 0x50, 0x57, 0x0A };
-const unsigned char STANDBY_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A, 0x40, 0x89, 0x01, 0x50, 0x57, 0x30, 0x0A };
-const unsigned char POWER_ON_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A, 0x40, 0x89, 0x01, 0x50, 0x57, 0x31, 0x0A };
-const unsigned char COOLING_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A, 0x40, 0x89, 0x01, 0x50, 0x57, 0x32, 0x0A };
-const unsigned char WARMING_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A, 0x40, 0x89, 0x01, 0x50, 0x57, 0x33, 0x0A };
-const unsigned char EMERGENCY_ACK[] { 0x06, 0x89, 0x01, 0x50, 0x57, 0x0A, 0x40, 0x89, 0x01, 0x50, 0x57, 0x34, 0x0A };
 
 const unsigned char NULL_COMMAND[] {0x21, 0x89, 0x01, 0x00, 0x00, 0x0A};
 
 bool has_active_connection = false;
+
+
+namespace {
+using Deadline = chrono::steady_clock::time_point;
+
+Deadline responseDeadline() {
+    return chrono::steady_clock::now() + chrono::milliseconds(SOCK_TIMEOUT_MS);
+}
+
+bool waitForSocket(int sock, short events, Deadline deadline, const char* stage,
+                   size_t completed, size_t expected) {
+    for (;;) {
+        const auto remaining = chrono::duration_cast<chrono::milliseconds>(
+            deadline - chrono::steady_clock::now()).count();
+        if (remaining <= 0) {
+            spdlog::error("{} timed out after {}ms ({} of {} bytes)",
+                          stage, SOCK_TIMEOUT_MS, completed, expected);
+            return false;
+        }
+        struct pollfd descriptor = {sock, events, 0};
+        int result = poll(&descriptor, 1, static_cast<int>(remaining));
+        if (result > 0) return true; // recv/send reports EOF or socket errors.
+        if (result < 0 && errno != EINTR) {
+            spdlog::error("{} poll failed: {}", stage, strerror(errno));
+            return false;
+        }
+    }
+}
+
+bool readExact(int sock, void* buffer, size_t length, Deadline deadline, const char* stage) {
+    auto* bytes = static_cast<unsigned char*>(buffer);
+    size_t received = 0;
+    while (received < length) {
+        if (!waitForSocket(sock, POLLIN, deadline, stage, received, length)) return false;
+        ssize_t count = recv(sock, bytes + received, length - received, MSG_DONTWAIT);
+        if (count > 0) {
+            received += static_cast<size_t>(count);
+        } else if (count == 0) {
+            spdlog::error("Truncated {}: connection closed after {} of {} bytes", stage, received, length);
+            return false;
+        } else if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+            spdlog::error("{} read failed: {}", stage, strerror(errno));
+            return false;
+        }
+    }
+    return true;
+}
+
+bool sendExact(int sock, const void* buffer, size_t length, const char* stage) {
+    const auto* bytes = static_cast<const unsigned char*>(buffer);
+    const auto deadline = responseDeadline();
+    size_t sent = 0;
+    while (sent < length) {
+        if (!waitForSocket(sock, POLLOUT, deadline, stage, sent, length)) return false;
+        ssize_t count = send(sock, bytes + sent, length - sent, MSG_DONTWAIT | MSG_NOSIGNAL);
+        if (count > 0) {
+            sent += static_cast<size_t>(count);
+        } else if (count == 0 || (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK)) {
+            spdlog::error("{} send failed after {} of {} bytes: {}", stage, sent, length, strerror(errno));
+            return false;
+        }
+    }
+    return true;
+}
+}
 
 
 int sendCommand(const char* host, const unsigned char* code, int codeLen, unsigned char* response) {
@@ -53,8 +113,8 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
     int sock { 0 };
     struct sockaddr_in serv_addr;
 
-    char buffer[MAX_RESPONSE_SIZE] { 0 };
-    std::array<unsigned char, MAX_RESPONSE_SIZE> response_buffer;
+    char buffer[6] = {};
+    unsigned char response_buffer[13] = {};
 
     int retCode { 0 };
 
@@ -67,10 +127,13 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
             break;
         }
 
-        const void* timeout = &SOCK_TIMEOUT_S;
-        socklen_t len = sizeof(int);
-        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, timeout, len);
-        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, timeout, len);
+        const struct timeval timeout = { SOCK_TIMEOUT_S, 0 };
+        if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0 ||
+            setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+            spdlog::error("Could not set socket timeouts: {}", strerror(errno));
+            retCode = -4;
+            break;
+        }
 
         serv_addr.sin_family = AF_INET;
         serv_addr.sin_port = htons(PORT);
@@ -102,59 +165,65 @@ int sendCommand(const char* host, const unsigned char* code, int codeLen, unsign
             break;
         }
 
-        // 1: Projector should send PJ_OK
-        if(read(sock, buffer, 4096) == -1) {
-            spdlog::error("Socket read error");
+        if (!readExact(sock, buffer, 5, responseDeadline(), "Projector greeting")) {
             retCode = -4;
             break;
-        };
-
-        if (strcmp(OPEN, buffer) != 0) {
+        }
+        if (memcmp(OPEN, buffer, 5) != 0) {
             spdlog::error("Unexpected greeting: {}", buffer);
             retCode = -5;
             break;
         }
 
-        // Clear buffer
-        memset(buffer, 0, sizeof(buffer));
-
-        // 2: Reply with PJREQ
-        send(sock, REQUEST, strlen(REQUEST), 0);
-
-        // 3: Projector should send PJACK
-        if(read(sock, buffer, 4096) == -1) {
-            spdlog::error("Socket read error");
+        if (!sendExact(sock, REQUEST, 5, "Handshake request") ||
+            !readExact(sock, buffer, 5, responseDeadline(), "Handshake reply")) {
             retCode = -4;
             break;
         }
-
-        if (strcmp(ACK, buffer) != 0) {
+        if (memcmp(ACK, buffer, 5) != 0) {
             spdlog::error("Unexpected ACK: {}", buffer);
             retCode = -5;
             break;
         }
 
-        // 4: Send user command to projector
-        send(sock, code, codeLen, 0);
-
-        // Clear buffer
-        memset(buffer, 0, sizeof(buffer));
-
-        // Return response to caller
-        ssize_t respLen = read(sock, static_cast<void *>(&response_buffer), 4096);
-        if( respLen == -1) {
-            spdlog::error("Socket read error");
+        if (!sendExact(sock, code, codeLen, "Projector command")) {
             retCode = -4;
             break;
         }
 
-        spdlog::debug(
-            "Received {} bytes from host: {:Xpn}",
-            respLen,
-            spdlog::to_hex(std::begin(response_buffer), std::begin(response_buffer) + respLen)
-        );
-        memcpy(response, response_buffer.data(), respLen);
-        retCode = respLen;
+        // ACK and status share one deadline; each fragment must not reset it.
+        const auto deadline = responseDeadline();
+        if (!readExact(sock, response_buffer, 6, deadline, "Command acknowledgment")) {
+            retCode = -4;
+            break;
+        }
+        if (response_buffer[0] != 0x06 || memcmp(response_buffer + 1, code + 1, 4) != 0 ||
+            response_buffer[5] != 0x0A) {
+            spdlog::error("Malformed command acknowledgment: {:Xpn}", spdlog::to_hex(response_buffer, response_buffer + 6));
+            retCode = -5;
+            break;
+        }
+
+        int response_length = 6;
+        if (codeLen == sizeof(QUERY_POWER_COMMAND) &&
+            memcmp(code, QUERY_POWER_COMMAND, sizeof(QUERY_POWER_COMMAND)) == 0) {
+            unsigned char* status = response_buffer + 6;
+            if (!readExact(sock, status, 7, deadline, "Power status reply")) {
+                retCode = -4;
+                break;
+            }
+            if (status[0] != 0x40 || memcmp(status + 1, code + 1, 4) != 0 || status[6] != 0x0A) {
+                spdlog::error("Malformed power status reply: {:Xpn}", spdlog::to_hex(status, status + 7));
+                retCode = -5;
+                break;
+            }
+            response_length = 13;
+        }
+
+        spdlog::debug("Received {} bytes from host: {:Xpn}", response_length,
+                      spdlog::to_hex(response_buffer, response_buffer + response_length));
+        memcpy(response, response_buffer, response_length);
+        retCode = response_length;
     } while (0);
 
     close(sock);
@@ -191,27 +260,15 @@ int queryPowerStatus() {
     if(ret < 0) {
         spdlog::error("Error communicating with host: {}", ret);
     } else {
-        if(memcmp(response, STANDBY_ACK, sizeof(STANDBY_ACK)) == 0) {
-            spdlog::debug("Power status is STANDBY");
-            return 0;
+        const unsigned char status = response[11];
+        if (ret == 13 && status >= '0' && status <= '4') {
+            static const char* const status_names[] = {
+                "STANDBY", "POWER_ON", "COOLING", "WARMING", "EMERGENCY"
+            };
+            spdlog::debug("Power status is {}", status_names[status - '0']);
+            return status - '0';
         }
-        if(memcmp(response, POWER_ON_ACK, sizeof(POWER_ON_ACK)) == 0) {
-            spdlog::debug("Power status is POWER_ON");
-            return 1;
-        }
-        if(memcmp(response, COOLING_ACK, sizeof(COOLING_ACK)) == 0) {
-            spdlog::debug("Power status is COOLING");
-            return 2;
-        }
-        if(memcmp(response, WARMING_ACK, sizeof(WARMING_ACK)) == 0) {
-            spdlog::debug("Power status is WARMING");
-            return 3;
-        }
-        if(memcmp(response, EMERGENCY_ACK, sizeof(EMERGENCY_ACK)) == 0) {
-            spdlog::debug("Power status is EMERGENCY");
-            return 4;
-        }
-        spdlog::error("Unknown power status encountered.");
+        spdlog::error("Unknown power status value: 0x{:02X}", status);
     }
     return -1;
 }
@@ -297,9 +354,12 @@ bool isOff() {
 }
 
 void setHost(const char * host) {
+    if (strlen(host) >= sizeof(HOST)) {
+        throw invalid_argument("Projector IPv4 address is too long");
+    }
     strcpy(HOST, host);
 }
 
 void setHost(char * host) {
-    strcpy(HOST, host);
+    setHost(static_cast<const char*>(host));
 }
